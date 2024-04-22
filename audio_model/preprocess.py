@@ -1,8 +1,9 @@
 import json
 import os
-import librosa
+import librosa, librosa.display
 import matplotlib.pyplot as plt
 import numpy as np
+import math
 
 # MIDI notes for open strings. First note is string 6 (lowest string).
 open_midi_notes = [40, 45, 50, 55, 59, 64]
@@ -11,28 +12,40 @@ def get_fret(string, midi_note):
   index = -string + 6
   return midi_note - open_midi_notes[index]
 
-# Loads audio for given labels.
+#TODO Loads audio for given labels.
 def load_samples(labels):
   for label in labels:
-    signal, sample_rate = librosa.load(label.file)
+    signal, sample_rate = librosa.load(label['file'])
 
-    plt.figure(figsize=(20, 5))
-    librosa.display.waveplot(signal, sr=sample_rate)
-    plt.title('Waveplot', fontdict=dict(size=18))
-    plt.xlabel('Time', fontdict=dict(size=15))
-    plt.ylabel('Amplitude', fontdict=dict(size=15))
-    plt.show()
+    # View file waveform 
+    # plt.figure(figsize=(20, 5))
+    # librosa.display.waveshow(signal, sr=sample_rate)
+    # plt.title('Waveplot', fontdict=dict(size=18))
+    # plt.xlabel('Time', fontdict=dict(size=15))
+    # plt.ylabel('Amplitude', fontdict=dict(size=15))
+    # plt.show()
+    
+    break
 
 # Labels include file, timestamp, and strings. 
 # Strings is an array of six fret values. [0] is string 6.
 def generate_labels():
-  data_dir = 'data/annotation/'
-  for filename in os.listdir(data_dir):
-    filepath = os.path.join(data_dir, filename)
-    print(filepath)
+  annotation_dir = 'data/annotation/'
+  data_dir = 'data/audio_mono-mic/'
+  labels = []
+
+  for filename in os.listdir(annotation_dir):
+    filepath = os.path.join(annotation_dir, filename)
+    print('Generating labels for filepath')
+
+    # Each annotation file corresponds to a wav file.
+    data_filepath = os.path.join(data_dir, filename.replace('.jams', '_mic.wav'))
 
     with open(filepath) as file:
       jams = json.load(file)
+
+      clip_length = jams['file_metadata']['duration']
+
       s6_midi = jams['annotations'][1]['data']
       s5_midi = jams['annotations'][3]['data']
       s4_midi = jams['annotations'][5]['data']
@@ -60,22 +73,37 @@ def generate_labels():
         note['fret'] = get_fret(1, note['value'])
     
       notes = s6_midi + s5_midi + s4_midi + s3_midi + s2_midi + s1_midi
-      notes.sort(key = lambda x: x['time'])
 
-      # Go through notes played and select samples.
-      # TODO How should labels be formatted? Multi-hot labels with 6 * 24 frets?
-      frets_playing = np.zeros(6*24)
-      for n in notes:
+      # Approach 1: Concatenate notes into sequence, then iterate through and select samples.
+      # notes.sort(key = lambda x: x['time'])
+
+      # # Go through notes played and select samples.
+      # # Multi-hot labels with 6 * 24 frets.
+      # frets_playing = np.zeros(6*24)
+      # for n in notes:
+
+      # Approach 2: Discretize clip into half-second long segments.
+      # Labels are multi-hot labels with 6*24 frets, starting with lowest string (sixth string).
+      # TODO Verify all math.
+      segment_frets = np.zeros((math.floor(clip_length * 2), 6 * 24))
+      for note in notes:
+        begin_time_index = math.floor(note['time'] * 2)
+        end_time_index = math.floor((note['time'] + note['duration']) * 2)
+        segment_frets[begin_time_index:(end_time_index+1), (-note['string'] + 6) * 24] = 1
         
+      for i in range(segment_frets.shape[0]):
+        labels.append({
+          'file': data_filepath,
+          'time': i / 2.0,
+          'frets': segment_frets[i]
+        })
+
     break
+
+  return  labels
 
 def main():
   labels = generate_labels()
-  # test_segment = {
-  #   'file': ,
-  #   'time': ,
-  #   'strings': []
-  # }
   samples = load_samples(labels)
 
 if __name__ == '__main__':
