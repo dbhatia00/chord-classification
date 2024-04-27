@@ -1,5 +1,6 @@
 import cv2
 import mediapipe as mp
+import numpy as np
 
 class HandTracker:
     def __init__(self):
@@ -72,10 +73,14 @@ class HandTracker:
         # Process the frame for hand tracking
         processFrames = self.hands.process(rgb_frame)
 
-        # Draw landmarks on the frame and extract data for each finger digit
+        # Create a blank canvas to draw only the landmarks
+        landmarks_canvas = np.zeros_like(frame)
+
+        # Draw landmarks on the canvas
         if processFrames.multi_hand_landmarks:
             for hand_landmarks in processFrames.multi_hand_landmarks:
-                # Draw landmarks on the frame
-                self.mpdrawing.draw_landmarks(frame, hand_landmarks, self.mphands.HAND_CONNECTIONS)
+                # Draw landmarks on the canvas
+                self.mpdrawing.draw_landmarks(landmarks_canvas, hand_landmarks, self.mphands.HAND_CONNECTIONS)
 
-        return frame
+        # Return the canvas with only the landmarks
+        return landmarks_canvas
