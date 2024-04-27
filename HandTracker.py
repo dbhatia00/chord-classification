@@ -23,6 +23,9 @@ class HandTracker:
     def track_hands_live_stream(self):
         # Start capturing video from webcam
         vidcap = cv2.VideoCapture(0)
+        
+        # Initialize variable to store previous hand landmarks
+        prev_landmarks = None
 
         while True:
             ret, frame = vidcap.read()
@@ -35,6 +38,24 @@ class HandTracker:
             # Display the frame
             cv2.imshow('Hand Tracking', frame_with_hands)
 
+            # Detect changes in hand position
+            current_landmarks = self._get_hand_landmarks(frame)
+            if prev_landmarks is not None and current_landmarks is not None:
+                # Calculate Euclidean distance between corresponding landmarks
+                # For simplicity, let's consider only the first hand detected
+                prev_hand = prev_landmarks[0]
+                curr_hand = current_landmarks[0]
+                distance = np.linalg.norm(prev_hand - curr_hand)
+                
+                # Threshold for significant change in hand position
+                threshold = 0.1  # Adjust as needed
+
+                if distance > threshold:
+                    print("Significant change in hand position detected!")
+
+            # Update previous landmarks
+            prev_landmarks = current_landmarks
+
             # Exit loop by pressing 'q'
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
@@ -42,6 +63,23 @@ class HandTracker:
         # Release the video capture and close windows
         vidcap.release()
         cv2.destroyAllWindows()
+
+    def _get_hand_landmarks(self, frame):
+        # Convert the BGR image to RGB
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+        # Process the frame for hand tracking
+        processFrames = self.hands.process(rgb_frame)
+
+        # Extract landmarks if hands are detected
+        if processFrames.multi_hand_landmarks:
+            landmarks = []
+            for hand_landmarks in processFrames.multi_hand_landmarks:
+                landmarks.append(np.array([[lmk.x, lmk.y] for lmk in hand_landmarks.landmark]))
+            return landmarks
+        else:
+            return None
+
 
     def track_hands_video(self, video_path):
         # Start capturing video from saved file
