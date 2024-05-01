@@ -4,6 +4,10 @@ import librosa, librosa.display
 import matplotlib.pyplot as plt
 import numpy as np
 import math
+from util import generate_dft
+
+SAMPLE_FREQ = 2.0
+NUMBER_FRETS = 22
 
 # MIDI notes for open strings. First note is string 6 (lowest string).
 open_midi_notes = [40, 45, 50, 55, 59, 64]
@@ -17,15 +21,13 @@ def load_samples(labels):
   for label in labels:
     signal, sample_rate = librosa.load(label['file'])
 
-    # View file waveform 
-    # plt.figure(figsize=(20, 5))
-    # librosa.display.waveshow(signal, sr=sample_rate)
-    # plt.title('Waveplot', fontdict=dict(size=18))
-    # plt.xlabel('Time', fontdict=dict(size=15))
-    # plt.ylabel('Amplitude', fontdict=dict(size=15))
-    # plt.show()
-    
-    break
+    start_time = label['time']
+    end_time = label['time'] + (1 / SAMPLE_FREQ)
+    samples = signal[int(start_time * sample_rate) : int(end_time * sample_rate)]
+
+    # Simple DFT or spectrogram? Spectrogram seems more suited for audio that changes over the frame (e.g. words). 
+    fft = generate_dft(samples)
+    print(fft.shape)
 
 # Labels include file, timestamp, and strings. 
 # Strings is an array of six fret values. [0] is string 6.
@@ -83,18 +85,18 @@ def generate_labels():
       # for n in notes:
 
       # Approach 2: Discretize clip into half-second long segments.
-      # Labels are multi-hot labels with 6*24 frets, starting with lowest string (sixth string).
+      # Labels are multi-hot labels with 6*22 frets, starting with lowest string (sixth string).
       # TODO Verify all math.
-      segment_frets = np.zeros((math.floor(clip_length * 2), 6 * 24))
+      segment_frets = np.zeros((math.floor(clip_length * SAMPLE_FREQ), 6 * NUMBER_FRETS))
       for note in notes:
-        begin_time_index = math.floor(note['time'] * 2)
-        end_time_index = math.floor((note['time'] + note['duration']) * 2)
-        segment_frets[begin_time_index:(end_time_index+1), (-note['string'] + 6) * 24] = 1
+        begin_time_index = math.floor(note['time'] * SAMPLE_FREQ)
+        end_time_index = math.floor((note['time'] + note['duration']) * SAMPLE_FREQ)
+        segment_frets[begin_time_index:(end_time_index+1), (-note['string'] + 6) * NUMBER_FRETS] = 1
         
       for i in range(segment_frets.shape[0]):
         labels.append({
           'file': data_filepath,
-          'time': i / 2.0,
+          'time': i / SAMPLE_FREQ,
           'frets': segment_frets[i]
         })
 
