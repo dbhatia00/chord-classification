@@ -3,11 +3,23 @@ import librosa
 import numpy as np
 import scipy
 import matplotlib.pyplot as plt
-from preprocess import generate_labels
+from preprocess import generate_labels, NUMBER_FRETS
 from tqdm import tqdm
 
-def acc(pred, target):
-  
+def accuracy(preds, labels):
+  accs = []
+  for i, label in enumerate(labels):
+    pred = preds[i]
+    label_frets = (label['frets'] == 1)
+    label_frets_sum = label_frets.sum()
+    print(label_frets_sum)
+    pred_label_frets = (pred[label_frets] == 1)
+    pred_label_frets_sum = pred_label_frets.sum()
+    print(pred[label_frets])
+    print(pred_label_frets_sum)
+
+    accs.append(pred_label_frets_sum/label_frets_sum)
+  return np.stack(accs)
 
 # E2 to E6, the range of a standard tuned guitar with 24 frets.
 note_pitches = [82.41, 87.31, 92.50, 98.00, 103.83, 110.0, 116.54, 123.47,
@@ -17,12 +29,12 @@ note_pitches = [82.41, 87.31, 92.50, 98.00, 103.83, 110.0, 116.54, 123.47,
                 1046.50, 1108.73, 1174.66, 1244.51, 1318.51]
 
 fret_board_notes = np.array([
-  [x for x in range(0, 25)],
-  [x for x in range(5, 30)],
-  [x for x in range(10, 35)],
-  [x for x in range(15, 40)],
-  [x for x in range(19, 44)],
-  [x for x in range(24, 49)]])
+  [x for x in range(0, NUMBER_FRETS+1)],
+  [x for x in range(5, 5 + NUMBER_FRETS+1)],
+  [x for x in range(10, 10 + NUMBER_FRETS+1)],
+  [x for x in range(15, 15 + NUMBER_FRETS+1)],
+  [x for x in range(19, 19 + NUMBER_FRETS+1)],
+  [x for x in range(24, 24 + NUMBER_FRETS+1)]])
 
 SAMPLE_FREQ = 2.0
 
@@ -82,14 +94,15 @@ def predict(labels):
     notes_idx = np.unique(notes_idx)
     
     # Predict matching fret 
-    frets = np.zeros((6, 25))
+    frets = np.zeros((6, NUMBER_FRETS+1))
     for note in notes_idx:
       frets[fret_board_notes == note] = 1
 
     # TODO Predict potential slides
 
-    preds.append(frets)
+    preds.append(frets.reshape(-1))
 
+  preds = np.stack(preds)
   return preds
 
 def load_samples():
@@ -103,6 +116,8 @@ def load_samples():
 def main():
   labels = generate_labels()
   pred = predict(labels)
+  acc = accuracy(pred, labels)
+  print(acc)
 
 if __name__ == '__main__':
   main()

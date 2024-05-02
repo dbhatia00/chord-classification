@@ -87,11 +87,13 @@ def generate_labels():
       # Approach 2: Discretize clip into half-second long segments.
       # Labels are multi-hot labels with 6*22 frets, starting with lowest string (sixth string).
       # TODO Verify all math.
-      segment_frets = np.zeros((math.floor(clip_length * SAMPLE_FREQ), 6 * NUMBER_FRETS))
+      segment_frets = np.zeros((math.floor(clip_length * SAMPLE_FREQ), 6 * (NUMBER_FRETS+1)))
       for note in notes:
+        fret = np.round(note['fret'])
+        fret_index = int((-note['string'] + 6) * (NUMBER_FRETS+1) + fret)
         begin_time_index = math.floor(note['time'] * SAMPLE_FREQ)
         end_time_index = math.floor((note['time'] + note['duration']) * SAMPLE_FREQ)
-        segment_frets[begin_time_index:(end_time_index+1), (-note['string'] + 6) * NUMBER_FRETS] = 1
+        segment_frets[begin_time_index:(end_time_index+1), fret_index] = 1
         
       for i in range(segment_frets.shape[0]):
         labels.append({
