@@ -6,21 +6,6 @@ import matplotlib.pyplot as plt
 from preprocess import generate_labels, NUMBER_FRETS
 from tqdm import tqdm
 
-def accuracy(preds, labels):
-  accs = []
-  for i, label in enumerate(labels):
-    pred = preds[i]
-    label_frets = (label['frets'] == 1)
-    label_frets_sum = label_frets.sum()
-    print(label_frets_sum)
-    pred_label_frets = (pred[label_frets] == 1)
-    pred_label_frets_sum = pred_label_frets.sum()
-    print(pred[label_frets])
-    print(pred_label_frets_sum)
-
-    accs.append(pred_label_frets_sum/label_frets_sum)
-  return np.stack(accs)
-
 # E2 to E6, the range of a standard tuned guitar with 24 frets.
 note_pitches = [82.41, 87.31, 92.50, 98.00, 103.83, 110.0, 116.54, 123.47,
                 130.81, 138.59, 146.83, 155.56, 164.81, 174.61, 185.00, 196.00, 207.65, 220.00, 233.08, 246.94,
@@ -41,6 +26,26 @@ SAMPLE_FREQ = 2.0
 # Pitches notes for open strings. First note is string 6 (lowest string).
 open_pitch_notes = [40, 45, 50, 55, 59, 64]
 
+def accuracy(preds, labels):
+  accs = []
+  for i, label in enumerate(labels):
+    pred = preds[i]
+
+    # Frets that are active during this sample
+    label_active_frets = (label['frets'] == 1)
+    label_active_frets_sum = label_active_frets.sum()
+
+    # Get predicted frets that match label active frets
+    pred_label_frets = (pred[label_active_frets] == 1)
+    pred_label_frets_sum = pred_label_frets.sum()
+
+    print(pred.reshape(6, 23))
+    print(label['frets'].reshape(6,23))
+    input()
+
+    accs.append(pred_label_frets_sum/label_active_frets_sum)
+  return np.stack(accs)
+
 def predict(labels):
   preds = []
 
@@ -59,7 +64,7 @@ def predict(labels):
 
     # Find Peaks indices
     peak_idx, _ = scipy.signal.find_peaks(dft, distance=4)
-    freqs = np.linspace(0, sample_rate, len(dft))
+    freqs = np.linspace(0, sample_rate * 0.5, len(dft)) # TODO: Investigate why 0.5 is needed
 
     # Plot fourier transform
     # plt.plot(freqs, dft)
@@ -70,7 +75,7 @@ def predict(labels):
 
     # Get peak frequencies
     peak_freqs = freqs[peak_idx]
-    # print(peak_freqs)
+    print(peak_freqs)
 
     # Plot fourier transform with just selected peaks
     # copy = dft.copy()
@@ -117,7 +122,7 @@ def main():
   labels = generate_labels()
   pred = predict(labels)
   acc = accuracy(pred, labels)
-  print(acc)
+  print('Average accuracy' + np.mean(acc))
 
 if __name__ == '__main__':
   main()
