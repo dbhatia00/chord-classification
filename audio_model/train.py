@@ -12,15 +12,17 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def main(
     batch_size: Optional[int] = typer.Option(16),
-    epochs: Optional[int] = typer.Option(10),
-    lr: Optional[float] = typer.Option(1e-5)):
+    epochs: Optional[int] = typer.Option(100),
+    lr: Optional[float] = typer.Option(4e-5)):
 
     print("getting data...")
     # Load data
     train_loader, test_loader = get_data(batch_size, 0.1)
 
-    print("Training...")
     audio_model = AudioModel().to(device)
+    total_params = sum(p.numel() for p in audio_model.parameters() if p.requires_grad)
+    print(f"Trainable parameters: {total_params}")
+    print("Training...")
 
     loss_func = nn.BCELoss()
     acc = metrics.MultilabelAccuracy()
@@ -30,6 +32,7 @@ def main(
     running_loss = 0.0
     x_total = 0
     for e in range(epochs):
+      print(f"Epoch {e}:")
       audio_model.train()
       for i, data in enumerate(tqdm(train_loader)):
         inputs, labels = data
@@ -56,7 +59,7 @@ def main(
       acc.reset()
       
       audio_model.eval()
-      for i, data in enumerate(tqdm(test_loader)):
+      for i, data in enumerate(test_loader):
         inputs, labels = data
         inputs = inputs.to(device)
         labels = labels.to(device)

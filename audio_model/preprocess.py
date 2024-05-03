@@ -18,6 +18,14 @@ def get_fret(string, midi_note):
   index = -string + 6
   return round(midi_note - open_midi_notes[index])
 
+def normalize_samples(samples):
+  # Scale by max value in the dataset
+  max_value = np.max(samples)
+  samples = samples / max_value
+
+  # TODO Chop off tons of higher frequencies
+  return samples
+
 def load_sample(label):
   sample_rate, signal = scipy.io.wavfile.read(label['file'])
 
@@ -28,6 +36,10 @@ def load_sample(label):
   fft = scipy.fft.rfft(samples)
   fft = np.abs(fft)
   xf = scipy.fft.rfftfreq(len(samples), 1 / sample_rate)
+  # print(xf[0:10])
+  # plt.plot(xf, yf)
+  # plt.xlim([0, 500])
+  # plt.show()
   return fft
 
 # Generates ffts for given labels.
@@ -113,23 +125,26 @@ def generate_labels():
 
   return  labels
 
-def get_data(batch_size, test_split):
-  if os.path.isfile('data.pkl'):
-    with open('data.pkl', 'rb') as data:
-      x, y = pickle.load(data)
-  else:
+def generate_data():
     labels = generate_labels()
     samples = load_samples(labels)
+    samples = normalize_samples(samples)
 
     print("Saving preprocessed data...")
     with open('data.pkl', 'wb') as out:
       target = []
       for label in labels:
         target.append(label['notes'])
+      target = np.stack(target)
       pickle.dump((samples, target), out, pickle.HIGHEST_PROTOCOL)
 
-    x, y = (samples, target)
+def get_data(batch_size, test_split):
+  if not os.path.isfile('data.pkl'):
+    generate_data()
     
+  with open('data.pkl', 'rb') as data:
+    x, y = pickle.load(data)
+
   split = math.floor(x.shape[0] * (1 - test_split))
   idx = np.random.permutation(x.shape[0])
   x = x[idx]
@@ -142,16 +157,7 @@ def get_data(batch_size, test_split):
   return train_loader, test_loader
 
 def main():
-  labels = generate_labels()
-  samples = load_samples(labels)
-
-  print("Saving preprocessed data...")
-  with open('data.pkl', 'wb') as out:
-    target = []
-    for label in labels:
-      target.append(label['notes'])
-    target = np.stack(target)
-    pickle.dump((samples, target), out, pickle.HIGHEST_PROTOCOL)
+  generate_data()
 
 if __name__ == '__main__':
   main()
