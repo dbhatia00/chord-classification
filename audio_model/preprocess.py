@@ -9,6 +9,7 @@ import pickle
 from tqdm import tqdm
 from dataset import GuitarDataset
 import math
+import torch
 
 # MIDI notes for open strings. First note is string 6 (lowest string).
 open_midi_notes = [40, 45, 50, 55, 59, 64]
@@ -112,12 +113,10 @@ def generate_labels():
 
   return  labels
 
-def get_data(batch_size):
+def get_data(batch_size, test_split):
   if os.path.isfile('data.pkl'):
     with open('data.pkl', 'rb') as data:
       x, y = pickle.load(data)
-      dataset = GuitarDataset(x, y, batch_size)
-      return dataset
   else:
     labels = generate_labels()
     samples = load_samples(labels)
@@ -128,9 +127,19 @@ def get_data(batch_size):
       for label in labels:
         target.append(label['notes'])
       pickle.dump((samples, target), out, pickle.HIGHEST_PROTOCOL)
+
+    x, y = (samples, target)
     
-    dataset = GuitarDataset(samples, labels, batch_size)
-    return dataset
+  split = math.floor(x.shape[0] * (1 - test_split))
+  idx = np.random.permutation(x.shape[0])
+  x = x[idx]
+  y = y[idx]
+  train_dataset = GuitarDataset(x[:split], y[:split], batch_size)
+  test_dataset = GuitarDataset(x[split:], y[split:], batch_size)
+  train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+  test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+
+  return train_loader, test_loader
 
 def main():
   labels = generate_labels()
