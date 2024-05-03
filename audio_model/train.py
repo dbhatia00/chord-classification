@@ -13,23 +13,25 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 def main(
     batch_size: Optional[int] = typer.Option(16),
     epochs: Optional[int] = typer.Option(10),
-    lr: Optional[float] = typer.Option(1e-6)):
+    lr: Optional[float] = typer.Option(1e-5)):
 
     print("getting data...")
     # Load data
     train_loader, test_loader = get_data(batch_size, 0.1)
 
+    print("Training...")
     audio_model = AudioModel().to(device)
 
-    loss_func = nn.CrossEntropyLoss()
-    acc = metrics.BinaryAccuracy()
-    opt = optim.Adam(audio_model.parameters(), lr=lr)
-
+    loss_func = nn.BCELoss()
+    acc = metrics.MultilabelAccuracy()
+    # opt = optim.Adam(audio_model.parameters(), lr=lr)
+    opt = optim.SGD(audio_model.parameters(), lr=lr, momentum=0.9)
 
     running_loss = 0.0
+    x_total = 0
     for e in range(epochs):
+      audio_model.train()
       for i, data in enumerate(tqdm(train_loader)):
-        # get the inputs; data is a list of [inputs, labels]
         inputs, labels = data
         inputs = inputs.to(device)
         labels = labels.to(device)
@@ -44,11 +46,26 @@ def main(
         opt.step()
 
         # print statistics
-        running_loss += loss.item()
+        running_loss += loss.item() * inputs.shape[0]
+        x_total += inputs.shape[0]
         acc.update(outputs, labels)
-        if i % 2000 == 1999:    # print every 2000 mini-batches
-            print(f'[{e + 1}, {i + 1:5d}] loss: {running_loss / 2000:.3f}')
-            running_loss = 0.0
+      print(f"Train loss: {running_loss / x_total}")
+      print(f"Train accuracy: {acc.compute()}")
+      running_loss = 0.0
+      x_total = 0
+      acc.reset()
+      
+      audio_model.eval()
+      for i, data in enumerate(tqdm(test_loader)):
+        inputs, labels = data
+        inputs = inputs.to(device)
+        labels = labels.to(device)
+
+        outputs = audio_model(inputs)
+        loss = loss_func(outputs, labels)
+        acc.update(outputs, labels)
+      print(f"Test accuracy: {acc.compute()}")
+      acc.reset()
 
     # Compile model
     # model = tf.keras.Sequential([
