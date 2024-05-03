@@ -6,7 +6,7 @@ import numpy as np
 import math
 from util import generate_dft
 
-SAMPLE_FREQ = 2.0
+SAMPLE_FREQ = 4
 NUMBER_FRETS = 22
 
 # MIDI notes for open strings. First note is string 6 (lowest string).
@@ -76,15 +76,7 @@ def generate_labels():
     
       notes = s6_midi + s5_midi + s4_midi + s3_midi + s2_midi + s1_midi
 
-      # Approach 1: Concatenate notes into sequence, then iterate through and select samples.
-      # notes.sort(key = lambda x: x['time'])
-
-      # # Go through notes played and select samples.
-      # # Multi-hot labels with 6 * 24 frets.
-      # frets_playing = np.zeros(6*24)
-      # for n in notes:
-
-      # Approach 2: Discretize clip into half-second long segments.
+      # Discretize clip into short segments.
       # Labels are multi-hot labels with 6*22 frets, starting with lowest string (sixth string).
       # TODO Verify all math.
       segment_frets = np.zeros((math.floor(clip_length * SAMPLE_FREQ), 6 * (NUMBER_FRETS+1)))
@@ -92,8 +84,8 @@ def generate_labels():
         fret = np.round(note['fret'])
         fret_index = int((-note['string'] + 6) * (NUMBER_FRETS+1) + fret)
         begin_time_index = math.floor(note['time'] * SAMPLE_FREQ)
-        end_time_index = math.floor((note['time'] + note['duration']) * SAMPLE_FREQ)
-        segment_frets[begin_time_index:(end_time_index+1), fret_index] = 1
+        end_time_index = math.ceil((note['time'] + note['duration']) * SAMPLE_FREQ)
+        segment_frets[begin_time_index:(end_time_index), fret_index] = 1
         
       for i in range(segment_frets.shape[0]):
         labels.append({

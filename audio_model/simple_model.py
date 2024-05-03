@@ -3,7 +3,7 @@ import librosa
 import numpy as np
 import scipy
 import matplotlib.pyplot as plt
-from preprocess import generate_labels, NUMBER_FRETS
+from preprocess import generate_labels, NUMBER_FRETS, SAMPLE_FREQ
 from tqdm import tqdm
 
 # E2 to E6, the range of a standard tuned guitar with 24 frets.
@@ -21,15 +21,13 @@ fret_board_notes = np.array([
   [x for x in range(19, 19 + NUMBER_FRETS+1)],
   [x for x in range(24, 24 + NUMBER_FRETS+1)]])
 
-SAMPLE_FREQ = 2.0
-
 # Pitches notes for open strings. First note is string 6 (lowest string).
 open_pitch_notes = [40, 45, 50, 55, 59, 64]
 
 def accuracy(preds, labels):
   accs = []
   for i, label in enumerate(labels):
-    pred = preds[i]
+    pred, num_notes = preds[i]
 
     # Frets that are active during this sample
     label_active_frets = (label['frets'] == 1)
@@ -38,36 +36,57 @@ def accuracy(preds, labels):
     # Get predicted frets that match label active frets
     pred_label_frets = (pred[label_active_frets] == 1)
     pred_label_frets_sum = pred_label_frets.sum()
+    print(num_notes, label_active_frets_sum)
 
-    print(pred.reshape(6, 23))
-    print(label['frets'].reshape(6,23))
-    input()
 
-    accs.append(pred_label_frets_sum/label_active_frets_sum)
+    # print(pred.reshape(6, 23))
+    # print(label['frets'].reshape(6,23))
+    # input()
+
+    if label_active_frets_sum == 0:
+      accs.append(1) 
+    else:
+      accs.append(pred_label_frets_sum/label_active_frets_sum)
   return np.stack(accs)
 
 def predict(labels):
   preds = []
 
-  signal, sample_rate = librosa.load(labels[0]['file'])
+  sample_rate_2, signal_2 = scipy.io.wavfile.read(labels[0]['file'])
   for i in tqdm(range(len(labels))):
     label = labels[i]
     start_time = label['time']
     end_time = label['time'] + (1 / SAMPLE_FREQ)
-    samples = signal[int(start_time * sample_rate) : int(end_time * sample_rate)]
+    samples = signal_2[int(start_time * sample_rate_2) : int(end_time * sample_rate_2)]
     dft = generate_dft(samples)
+
+    samples_2 = signal_2[int(start_time * sample_rate_2) : int(end_time * sample_rate_2)]
+    yf = scipy.fft.fft(samples_2)
+    yf = np.abs(yf)
+    xf = scipy.fft.fftfreq(len(samples_2), 1 / sample_rate_2)
+    xf_copy = xf.copy()
+    yf_copy = yf.copy()
     
-    # Remove background noise and threshold at 20% max frequency magnitude.
-    max_value = np.max(dft)
-    dft = np.where(dft < 5, 0, dft)
-    dft = np.where(dft < max_value * 0.2, 0, dft)
+    # # Remove background noise and threshold at 20% max frequency magnitude.
+    # max_value = np.max(dft)
+    # dft = np.where(dft < 10, 0, dft)
+    # dft = np.where(dft < max_value * 0.05, 0, dft)
+
+    # # Find Peaks indices
+    # peak_idx, _ = scipy.signal.find_peaks(dft, distance=5)
+    # freqs = np.linspace(0, sample_rate * 0.5, len(dft)) # TODO: Investigate why 0.5 is needed
+
+    max_value = np.max(yf)
+    yf = np.where(yf < 200000, 0, yf)
+    yf = np.where(yf < max_value * 0.05, 0, yf)
 
     # Find Peaks indices
-    peak_idx, _ = scipy.signal.find_peaks(dft, distance=4)
-    freqs = np.linspace(0, sample_rate * 0.5, len(dft)) # TODO: Investigate why 0.5 is needed
+    peak_idx, props = scipy.signal.find_peaks(yf, distance=5, prominence=250000)
+    # print(props)
+    freqs = np.linspace(0, sample_rate_2, len(yf))
 
     # Plot fourier transform
-    # plt.plot(freqs, dft)
+    # plt.plot(freqs, yf)
     # plt.title('Discrete-Fourier Transform', fontdict=dict(size=15))
     # plt.xlabel('Frequency', fontdict=dict(size=12))
     # plt.ylabel('Magnitude', fontdict=dict(size=12))
@@ -75,7 +94,7 @@ def predict(labels):
 
     # Get peak frequencies
     peak_freqs = freqs[peak_idx]
-    print(peak_freqs)
+    # print(peak_freqs)
 
     # Plot fourier transform with just selected peaks
     # copy = dft.copy()
@@ -90,6 +109,7 @@ def predict(labels):
 
     # Discard peak frequencies outside of guitar range (F6 and D#2)
     peak_freqs = peak_freqs[(peak_freqs < 1396.91) & (peak_freqs > 77.78)]
+    # print(peak_freqs)
 
     peak_notes = np.tile(note_pitches, (peak_freqs.shape[0], 1))
     peak_freqs = np.tile(peak_freqs, (peak_notes.shape[1], 1)).T
@@ -97,6 +117,7 @@ def predict(labels):
 
     # remove any dupes (peaks too close together)
     notes_idx = np.unique(notes_idx)
+    # print(notes_idx)
     
     # Predict matching fret 
     frets = np.zeros((6, NUMBER_FRETS+1))
@@ -105,9 +126,13 @@ def predict(labels):
 
     # TODO Predict potential slides
 
-    preds.append(frets.reshape(-1))
+    # print(label['frets'].reshape(6, NUMBER_FRETS+1))
+    # plt.plot(xf_copy, yf_copy)
+    # plt.xlim([0, 500])
+    # plt.show()
 
-  preds = np.stack(preds)
+    preds.append((frets.reshape(-1), notes_idx.shape[0]))
+
   return preds
 
 def load_samples():
@@ -122,7 +147,8 @@ def main():
   labels = generate_labels()
   pred = predict(labels)
   acc = accuracy(pred, labels)
-  print('Average accuracy' + np.mean(acc))
+  print(acc)
+  print('Average accuracy: ' + str(np.mean(acc).item()))
 
 if __name__ == '__main__':
   main()
