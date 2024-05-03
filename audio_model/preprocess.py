@@ -1,13 +1,12 @@
 import json
 import os
-import librosa, librosa.display
+import scipy
 import matplotlib.pyplot as plt
 import numpy as np
 import math
-from util import generate_dft
-
-SAMPLE_FREQ = 4
-NUMBER_FRETS = 22
+from util import NUMBER_FRETS, SAMPLE_FREQ
+import pickle
+from tqdm import tqdm
 
 # MIDI notes for open strings. First note is string 6 (lowest string).
 open_midi_notes = [40, 45, 50, 55, 59, 64]
@@ -16,18 +15,32 @@ def get_fret(string, midi_note):
   index = -string + 6
   return midi_note - open_midi_notes[index]
 
-#TODO Loads audio for given labels.
+def load_sample(label):
+  sample_rate, signal = scipy.io.wavfile.read(label['file'])
+
+  start_time = label['time']
+  end_time = label['time'] + (1 / SAMPLE_FREQ)
+  samples = signal[int(start_time * sample_rate) : int(end_time * sample_rate)]
+
+  fft = scipy.fft.fft(samples)
+  fft = np.abs(fft)
+  return fft
+
+# Generates ffts for given labels.
 def load_samples(labels):
-  for label in labels:
-    signal, sample_rate = librosa.load(label['file'])
+  # Calculate size of array based on first sample.
+  fft = load_sample(labels[0])
+  sample_ffts = np.zeros((len(labels), fft.shape[0]))
+  sample_ffts = []
 
-    start_time = label['time']
-    end_time = label['time'] + (1 / SAMPLE_FREQ)
-    samples = signal[int(start_time * sample_rate) : int(end_time * sample_rate)]
-
-    # Simple DFT or spectrogram? Spectrogram seems more suited for audio that changes over the frame (e.g. words). 
-    fft = generate_dft(samples)
-    print(fft.shape)
+  print("Generating FFTs...")
+  for i in tqdm(range(len(labels))):
+    fft = load_sample(labels[i])
+    # sample_ffts[i] = fft
+    sample_ffts.append(fft)
+  
+  # return sample_ffts
+  return np.stack(sample_ffts)
 
 # Labels include file, timestamp, and strings. 
 # Strings is an array of six fret values. [0] is string 6.
@@ -38,7 +51,7 @@ def generate_labels():
 
   for filename in os.listdir(annotation_dir):
     filepath = os.path.join(annotation_dir, filename)
-    print('Generating labels for filepath')
+    print(f'Generating labels for {filename}')
 
     # Each annotation file corresponds to a wav file.
     data_filepath = os.path.join(data_dir, filename.replace('.jams', '_mic.wav'))
@@ -78,7 +91,6 @@ def generate_labels():
 
       # Discretize clip into short segments.
       # Labels are multi-hot labels with 6*22 frets, starting with lowest string (sixth string).
-      # TODO Verify all math.
       segment_frets = np.zeros((math.floor(clip_length * SAMPLE_FREQ), 6 * (NUMBER_FRETS+1)))
       for note in notes:
         fret = np.round(note['fret'])
@@ -94,13 +106,15 @@ def generate_labels():
           'frets': segment_frets[i]
         })
 
-    break
-
   return  labels
 
 def main():
   labels = generate_labels()
   samples = load_samples(labels)
+
+  print("Saving preprocessed data...")
+  with open('data.pkl', 'wb') as out:
+    pickle.dump((labels, samples), out, pickle.HIGHEST_PROTOCOL)
 
 if __name__ == '__main__':
   main()

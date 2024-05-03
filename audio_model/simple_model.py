@@ -1,9 +1,9 @@
-from util import generate_dft
+from util import NUMBER_FRETS, SAMPLE_FREQ
 import librosa
 import numpy as np
 import scipy
 import matplotlib.pyplot as plt
-from preprocess import generate_labels, NUMBER_FRETS, SAMPLE_FREQ
+from preprocess import generate_labels
 from tqdm import tqdm
 
 # E2 to E6, the range of a standard tuned guitar with 24 frets.
@@ -52,38 +52,25 @@ def accuracy(preds, labels):
 def predict(labels):
   preds = []
 
-  sample_rate_2, signal_2 = scipy.io.wavfile.read(labels[0]['file'])
+  sample_rate, signal = scipy.io.wavfile.read(labels[0]['file'])
   for i in tqdm(range(len(labels))):
     label = labels[i]
     start_time = label['time']
     end_time = label['time'] + (1 / SAMPLE_FREQ)
-    samples = signal_2[int(start_time * sample_rate_2) : int(end_time * sample_rate_2)]
-    dft = generate_dft(samples)
+    samples = signal[int(start_time * sample_rate) : int(end_time * sample_rate)]
 
-    samples_2 = signal_2[int(start_time * sample_rate_2) : int(end_time * sample_rate_2)]
-    yf = scipy.fft.fft(samples_2)
+    yf = scipy.fft.fft(samples)
     yf = np.abs(yf)
-    xf = scipy.fft.fftfreq(len(samples_2), 1 / sample_rate_2)
-    xf_copy = xf.copy()
-    yf_copy = yf.copy()
+    xf = scipy.fft.fftfreq(len(samples), 1 / sample_rate)
     
-    # # Remove background noise and threshold at 20% max frequency magnitude.
-    # max_value = np.max(dft)
-    # dft = np.where(dft < 10, 0, dft)
-    # dft = np.where(dft < max_value * 0.05, 0, dft)
-
-    # # Find Peaks indices
-    # peak_idx, _ = scipy.signal.find_peaks(dft, distance=5)
-    # freqs = np.linspace(0, sample_rate * 0.5, len(dft)) # TODO: Investigate why 0.5 is needed
-
+    # Remove background noise and threshold related to max frequency magnitude.
     max_value = np.max(yf)
     yf = np.where(yf < 200000, 0, yf)
     yf = np.where(yf < max_value * 0.05, 0, yf)
 
     # Find Peaks indices
     peak_idx, props = scipy.signal.find_peaks(yf, distance=5, prominence=250000)
-    # print(props)
-    freqs = np.linspace(0, sample_rate_2, len(yf))
+    freqs = np.linspace(0, sample_rate, len(yf))
 
     # Plot fourier transform
     # plt.plot(freqs, yf)
