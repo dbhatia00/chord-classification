@@ -122,14 +122,6 @@ def predict(labels):
 
   return preds
 
-def load_samples():
-  signal, sample_rate = librosa.load('data/audio_mono-mic/00_BN1-129-Eb_comp_mic.wav')
-
-  start_time = 5
-  end_time = 5 + (1 / SAMPLE_FREQ)
-  samples = signal[int(start_time * sample_rate) : int(end_time * sample_rate)]
-  return samples, sample_rate
-
 def main():
   labels = generate_labels()
   pred = predict(labels)

@@ -17,9 +17,3 @@ fret_board_notes = np.array([
   [x for x in range(15, 15 + NUMBER_FRETS+1)],
   [x for x in range(19, 19 + NUMBER_FRETS+1)],
   [x for x in range(24, 24 + NUMBER_FRETS+1)]])
-
-def generate_dft(samples):
-  fft = np.fft.fft(samples)
-  fft = np.abs(fft)
-  fft = fft[:int(len(fft)/2)]
-  return fft

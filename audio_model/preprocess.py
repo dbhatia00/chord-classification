@@ -7,13 +7,15 @@ import math
 from util import NUMBER_FRETS, SAMPLE_FREQ
 import pickle
 from tqdm import tqdm
+from dataset import GuitarDataset
+import math
 
 # MIDI notes for open strings. First note is string 6 (lowest string).
 open_midi_notes = [40, 45, 50, 55, 59, 64]
 
 def get_fret(string, midi_note):
   index = -string + 6
-  return midi_note - open_midi_notes[index]
+  return round(midi_note - open_midi_notes[index])
 
 def load_sample(label):
   sample_rate, signal = scipy.io.wavfile.read(label['file'])
@@ -22,8 +24,9 @@ def load_sample(label):
   end_time = label['time'] + (1 / SAMPLE_FREQ)
   samples = signal[int(start_time * sample_rate) : int(end_time * sample_rate)]
 
-  fft = scipy.fft.fft(samples)
+  fft = scipy.fft.rfft(samples)
   fft = np.abs(fft)
+  xf = scipy.fft.rfftfreq(len(samples), 1 / sample_rate)
   return fft
 
 # Generates ffts for given labels.
@@ -36,10 +39,8 @@ def load_samples(labels):
   print("Generating FFTs...")
   for i in tqdm(range(len(labels))):
     fft = load_sample(labels[i])
-    # sample_ffts[i] = fft
     sample_ffts.append(fft)
   
-  # return sample_ffts
   return np.stack(sample_ffts)
 
 # Labels include file, timestamp, and strings. 
@@ -92,21 +93,44 @@ def generate_labels():
       # Discretize clip into short segments.
       # Labels are multi-hot labels with 6*22 frets, starting with lowest string (sixth string).
       segment_frets = np.zeros((math.floor(clip_length * SAMPLE_FREQ), 6 * (NUMBER_FRETS+1)))
+      segment_notes = np.zeros((math.floor(clip_length * SAMPLE_FREQ), 49)) # Guitars can play 49 notes
       for note in notes:
         fret = np.round(note['fret'])
         fret_index = int((-note['string'] + 6) * (NUMBER_FRETS+1) + fret)
         begin_time_index = math.floor(note['time'] * SAMPLE_FREQ)
         end_time_index = math.ceil((note['time'] + note['duration']) * SAMPLE_FREQ)
         segment_frets[begin_time_index:(end_time_index), fret_index] = 1
-        
+        segment_notes[begin_time_index:(end_time_index), round(note['value'] - 40)] = 1
+      
       for i in range(segment_frets.shape[0]):
         labels.append({
           'file': data_filepath,
           'time': i / SAMPLE_FREQ,
-          'frets': segment_frets[i]
+          'frets': segment_frets[i],
+          'notes': segment_notes[i]
         })
 
   return  labels
+
+def get_data(batch_size):
+  if os.path.isfile('data.pkl'):
+    with open('data.pkl', 'rb') as data:
+      x, y = pickle.load(data)
+      dataset = GuitarDataset(x, y, batch_size)
+      return dataset
+  else:
+    labels = generate_labels()
+    samples = load_samples(labels)
+
+    print("Saving preprocessed data...")
+    with open('data.pkl', 'wb') as out:
+      target = []
+      for label in labels:
+        target.append(label['notes'])
+      pickle.dump((samples, target), out, pickle.HIGHEST_PROTOCOL)
+    
+    dataset = GuitarDataset(samples, labels, batch_size)
+    return dataset
 
 def main():
   labels = generate_labels()
@@ -114,7 +138,11 @@ def main():
 
   print("Saving preprocessed data...")
   with open('data.pkl', 'wb') as out:
-    pickle.dump((labels, samples), out, pickle.HIGHEST_PROTOCOL)
+    target = []
+    for label in labels:
+      target.append(label['notes'])
+    target = np.stack(target)
+    pickle.dump((samples, target), out, pickle.HIGHEST_PROTOCOL)
 
 if __name__ == '__main__':
   main()
