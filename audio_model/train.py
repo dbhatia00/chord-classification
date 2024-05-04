@@ -26,6 +26,7 @@ def main(
 
     loss_func = nn.BCELoss()
     acc = metrics.MultilabelAccuracy()
+    acc_hamming = metrics.MultilabelAccuracy(criteria="hamming")
     # opt = optim.Adam(audio_model.parameters(), lr=lr)
     opt = optim.SGD(audio_model.parameters(), lr=lr, momentum=0.9)
 
@@ -49,12 +50,15 @@ def main(
         running_loss += loss.item() * inputs.shape[0]
         x_total += inputs.shape[0]
         acc.update(outputs, labels)
+        acc_hamming.update(outputs, labels)
 
       print(f"Train loss: {running_loss / x_total}")
       print(f"Train accuracy: {acc.compute()}")
+      print(f"Train hamming accuracy: {acc_hamming.compute()}")
       running_loss = 0.0
       x_total = 0
       acc.reset()
+      acc_hamming.reset()
       
       audio_model.eval()
       for i, data in enumerate(test_loader):
@@ -65,9 +69,11 @@ def main(
         outputs = audio_model(inputs)
         loss = loss_func(outputs, labels)
         acc.update(outputs, labels)
+        acc_hamming.update(outputs, labels)
 
       print(f"Test accuracy: {acc.compute()}")
-      acc.reset()
+      print(f"Test hamming accuracy: {acc_hamming.compute()}")
+      acc_hamming.reset()
 
 if __name__ == '__main__':
   typer.run(main)
