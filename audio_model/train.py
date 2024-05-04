@@ -13,7 +13,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 def main(
     batch_size: Optional[int] = typer.Option(16),
     epochs: Optional[int] = typer.Option(100),
-    lr: Optional[float] = typer.Option(4e-5)):
+    lr: Optional[float] = typer.Option(4e-4)):
 
     print("getting data...")
     # Load data
@@ -39,19 +39,17 @@ def main(
         inputs = inputs.to(device)
         labels = labels.to(device)
 
-        # zero the parameter gradients
         opt.zero_grad()
 
-        # forward + backward + optimize
         outputs = audio_model(inputs)
         loss = loss_func(outputs, labels)
         loss.backward()
         opt.step()
 
-        # print statistics
         running_loss += loss.item() * inputs.shape[0]
         x_total += inputs.shape[0]
         acc.update(outputs, labels)
+
       print(f"Train loss: {running_loss / x_total}")
       print(f"Train accuracy: {acc.compute()}")
       running_loss = 0.0
@@ -67,32 +65,9 @@ def main(
         outputs = audio_model(inputs)
         loss = loss_func(outputs, labels)
         acc.update(outputs, labels)
+
       print(f"Test accuracy: {acc.compute()}")
       acc.reset()
-
-    # Compile model
-    # model = tf.keras.Sequential([
-    #   tf.keras.layers.Conv1D(50, 11, input_shape=(5513, 1)),
-    #   tf.keras.layers.MaxPool1D(2),
-    #   tf.keras.layers.Conv1D(50, 11),
-    #   tf.keras.layers.MaxPool1D(2),
-    #   tf.keras.layers.Conv1D(50, 11),
-    #   tf.keras.layers.MaxPool1D(2),
-    #   tf.keras.layers.Flatten(),
-    #   tf.keras.layers.Dense(1000, activation='relu'),
-    #   tf.keras.layers.Dense(500, activation='relu'),
-    #   tf.keras.layers.Dense(49, activation='softmax'),
-    # ])
-
-    # model.compile(
-    #    optimizer=tf.keras.optimizers.Adam(learning_rate=lr),
-    #    loss=tf.keras.losses.BinaryCrossentropy(),
-    #    metrics=[
-    #       tf.keras.metrics.BinaryAccuracy()
-    #    ])
-
-    # # Train
-    # model.fit(dataset, epochs=epochs, shuffle=True)
 
 if __name__ == '__main__':
   typer.run(main)

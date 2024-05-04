@@ -4,12 +4,14 @@ import scipy
 import matplotlib.pyplot as plt
 import numpy as np
 import math
-from util import NUMBER_FRETS, SAMPLE_FREQ
+from util import NUMBER_FRETS, SAMPLE_FREQ, mel_filter_bank
 import pickle
 from tqdm import tqdm
 from dataset import GuitarDataset
 import math
 import torch
+import librosa
+
 
 # MIDI notes for open strings. First note is string 6 (lowest string).
 open_midi_notes = [40, 45, 50, 55, 59, 64]
@@ -18,13 +20,26 @@ def get_fret(string, midi_note):
   index = -string + 6
   return round(midi_note - open_midi_notes[index])
 
-def normalize_samples(samples):
+def normalize_sample(samples, sample_rate):
   # Scale by max value in the dataset
-  max_value = np.max(samples)
-  samples = samples / max_value
+  # max_value = np.max(samples)
+  # samples = samples * 100 / max_value
+
+  # mean = np.mean(samples, axis=0)
+  # std_dev = np.std(samples, axis=0)
+  # samples = (samples - mean) / std_dev
+
+  mel_filter = librosa.filters.mel(n_fft=samples.shape[0]*2, sr=sample_rate, n_mels=128, norm=None)
+  # for sample in samples:
+  samples = mel_filter.dot(samples)
+  plt.plot(samples)
+  plt.legend(labels=['Hz', 'mel'])
 
   # TODO Chop off tons of higher frequencies
   return samples
+
+# Kind of a hack
+mel_filter = None
 
 def load_sample(label):
   sample_rate, signal = scipy.io.wavfile.read(label['file'])
@@ -33,17 +48,35 @@ def load_sample(label):
   end_time = label['time'] + (1 / SAMPLE_FREQ)
   samples = signal[int(start_time * sample_rate) : int(end_time * sample_rate)]
 
-  fft = scipy.fft.rfft(samples)
-  fft = np.abs(fft)
-  xf = scipy.fft.rfftfreq(len(samples), 1 / sample_rate)
+  # fft = scipy.fft.rfft(samples)
+  # xf = scipy.fft.rfftfreq(len(samples), 1 / sample_rate)
+  # fft = normalize_sample(fft, sample_rate)
+
   # print(xf[0:10])
   # plt.plot(xf, yf)
   # plt.xlim([0, 500])
   # plt.show()
-  return fft
+
+  num_coefficients = 256 # Size of mfcc array
+  min_hz = 0
+  max_hz = 5000
+
+  complex_spectrum= np.fft.rfft(samples)
+  power_spectrum = abs(complex_spectrum) ** 2
+  # global mel_filter
+  # if mel_filter is None:
+  #   mel_filter = mel_filter_bank(power_spectrum.shape[0], num_coefficients, min_hz, max_hz)
+  # filtered_spectrum = np.dot(power_spectrum, mel_filter)
+  # log_spectrum = np.log(filtered_spectrum)
+  log_spectrum = np.ma.log(power_spectrum)
+  log_spectrum = log_spectrum.filled(0)
+  dctSpectrum = scipy.fft.dct(log_spectrum, type=2) # MFCC
+
+  return dctSpectrum
 
 # Generates ffts for given labels.
 def load_samples(labels):
+
   # Calculate size of array based on first sample.
   fft = load_sample(labels[0])
   sample_ffts = np.zeros((len(labels), fft.shape[0]))
@@ -128,7 +161,6 @@ def generate_labels():
 def generate_data():
     labels = generate_labels()
     samples = load_samples(labels)
-    samples = normalize_samples(samples)
 
     print("Saving preprocessed data...")
     with open('data.pkl', 'wb') as out:
