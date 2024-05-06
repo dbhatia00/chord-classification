@@ -13,7 +13,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 def main(
     batch_size: Optional[int] = typer.Option(16),
     epochs: Optional[int] = typer.Option(100),
-    lr: Optional[float] = typer.Option(4e-4)):
+    lr: Optional[float] = typer.Option(5e-5)):
 
     print("getting data...")
     # Load data
@@ -28,8 +28,8 @@ def main(
     acc = metrics.MultilabelAccuracy()
     acc_hamming = metrics.MultilabelAccuracy(criteria="hamming")
     acc_contain = metrics.MultilabelAccuracy(criteria="contain")
-    # opt = optim.Adam(audio_model.parameters(), lr=lr)
-    opt = optim.SGD(audio_model.parameters(), lr=lr, momentum=0.9)
+    opt = optim.Adam(audio_model.parameters(), lr=lr)
+    # opt = optim.SGD(audio_model.parameters(), lr=lr, momentum=0.9)
 
     running_loss = 0.0
     x_total = 0

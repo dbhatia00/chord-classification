@@ -43,7 +43,8 @@ mel_filter = None
 
 def load_sample(label, min, max):
   sample_rate, signal = scipy.io.wavfile.read(label['file'])
-  signal = (signal - min) / (max - min)
+  # signal = (signal - min) / (max - min)
+  signal = signal / max
 
   start_time = label['time']
   end_time = label['time'] + (1.0 / SAMPLE_FREQ)
@@ -58,23 +59,29 @@ def load_sample(label, min, max):
   # plt.xlim([0, 500])
   # plt.show()
 
-  num_coefficients = 256 # Size of mfcc array
+  num_coefficients = 750 # Size of mfcc array
   min_hz = 0
   max_hz = 5000
 
-  # complex_spectrum= np.fft.rfft(samples)
   complex_spectrum= np.fft.fft(samples)
-  xf = scipy.fft.fftfreq(len(samples), 1 / sample_rate)
+  # xf = scipy.fft.fftfreq(len(samples), 1 / sample_rate)
   power_spectrum = abs(complex_spectrum) ** 2
-  power_spectrum = np.where(power_spectrum == 0.0, 1e-10, power_spectrum)
-  # global mel_filter
-  # if mel_filter is None:
-  #   mel_filter = mel_filter_bank(power_spectrum.shape[0], num_coefficients, min_hz, max_hz)
-  # filtered_spectrum = np.dot(power_spectrum, mel_filter)
-  # log_spectrum = np.log(filtered_spectrum)
-  log_spectrum = np.log(power_spectrum)
+  global mel_filter
+  if mel_filter is None:
+    mel_filter = mel_filter_bank(power_spectrum.shape[0], num_coefficients, min_hz, max_hz)
+  filtered_spectrum = np.dot(power_spectrum[:5511], mel_filter[:5511])
+  filtered_spectrum = np.where(filtered_spectrum == 0.0, 1e-10, filtered_spectrum)
+  log_spectrum = np.log(filtered_spectrum)
   dct_spectrum = scipy.fft.dct(log_spectrum, type=2) # MFCC
-  dct_spectrum = dct_spectrum[:5511]
+  dct_spectrum = dct_spectrum
+  # plt.plot(xf[:5511], complex_spectrum[:5511])
+  # plt.show()
+  # plt.plot(xf[:5511], power_spectrum[:5511])
+  # plt.show()
+  # plt.plot(xf[:5511], log_spectrum[:5511])
+  # plt.show()
+  # plt.plot(xf[:5511], dct_spectrum[:5511])
+  # plt.show()
   return dct_spectrum
 
 # Generates ffts for given labels.
