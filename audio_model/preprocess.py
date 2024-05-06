@@ -41,11 +41,12 @@ def normalize_sample(samples, sample_rate):
 # Kind of a hack
 mel_filter = None
 
-def load_sample(label):
+def load_sample(label, min, max):
   sample_rate, signal = scipy.io.wavfile.read(label['file'])
+  signal = (signal - min) / (max - min)
 
   start_time = label['time']
-  end_time = label['time'] + (1 / SAMPLE_FREQ)
+  end_time = label['time'] + (1.0 / SAMPLE_FREQ)
   samples = signal[int(start_time * sample_rate) : int(end_time * sample_rate)]
 
   # fft = scipy.fft.rfft(samples)
@@ -61,30 +62,36 @@ def load_sample(label):
   min_hz = 0
   max_hz = 5000
 
-  complex_spectrum= np.fft.rfft(samples)
+  # complex_spectrum= np.fft.rfft(samples)
+  complex_spectrum= np.fft.fft(samples)
+  xf = scipy.fft.fftfreq(len(samples), 1 / sample_rate)
   power_spectrum = abs(complex_spectrum) ** 2
+  power_spectrum = np.where(power_spectrum == 0.0, 1e-10, power_spectrum)
   # global mel_filter
   # if mel_filter is None:
   #   mel_filter = mel_filter_bank(power_spectrum.shape[0], num_coefficients, min_hz, max_hz)
   # filtered_spectrum = np.dot(power_spectrum, mel_filter)
   # log_spectrum = np.log(filtered_spectrum)
-  log_spectrum = np.ma.log(power_spectrum)
-  log_spectrum = log_spectrum.filled(0)
-  dctSpectrum = scipy.fft.dct(log_spectrum, type=2) # MFCC
-
-  return dctSpectrum
+  log_spectrum = np.log(power_spectrum)
+  dct_spectrum = scipy.fft.dct(log_spectrum, type=2) # MFCC
+  dct_spectrum = dct_spectrum[:5511]
+  return dct_spectrum
 
 # Generates ffts for given labels.
 def load_samples(labels):
+  sample_rate, signal = scipy.io.wavfile.read(labels[0]['file'])
+  signal = signal.astype(np.float32)
+  min = np.min(signal)
+  max = np.max(signal)
 
   # Calculate size of array based on first sample.
-  fft = load_sample(labels[0])
+  fft = load_sample(labels[0], min, max)
   sample_ffts = np.zeros((len(labels), fft.shape[0]))
   sample_ffts = []
 
   print("Generating FFTs...")
   for i in tqdm(range(len(labels))):
-    fft = load_sample(labels[i])
+    fft = load_sample(labels[i], min, max)
     sample_ffts.append(fft)
   
   return np.stack(sample_ffts)
@@ -140,6 +147,7 @@ def generate_labels():
       # Labels are multi-hot labels with 6*22 frets, starting with lowest string (sixth string).
       segment_frets = np.zeros((math.floor(clip_length * SAMPLE_FREQ), 6 * (NUMBER_FRETS+1)))
       segment_notes = np.zeros((math.floor(clip_length * SAMPLE_FREQ), 49)) # Guitars can play 49 notes
+      valid = np.ones((math.floor(clip_length*SAMPLE_FREQ)))
       for note in notes:
         fret = np.round(note['fret'])
         fret_index = int((-note['string'] + 6) * (NUMBER_FRETS+1) + fret)
@@ -147,14 +155,21 @@ def generate_labels():
         end_time_index = math.ceil((note['time'] + note['duration']) * SAMPLE_FREQ)
         segment_frets[begin_time_index:(end_time_index), fret_index] = 1
         segment_notes[begin_time_index:(end_time_index), round(note['value'] - 40)] = 1
+
+        # Segments where a note starts or ends are invalid
+        if begin_time_index < valid.shape[0]:
+          valid[begin_time_index] = 0
+        if (end_time_index < valid.shape[0]):
+          valid[end_time_index] = 0
       
       for i in range(segment_frets.shape[0]):
-        labels.append({
-          'file': data_filepath,
-          'time': i / SAMPLE_FREQ,
-          'frets': segment_frets[i],
-          'notes': segment_notes[i]
-        })
+        if valid[i] == 1:
+          labels.append({
+            'file': data_filepath,
+            'time': i / SAMPLE_FREQ,
+            'frets': segment_frets[i],
+            'notes': segment_notes[i]
+          })
 
   return  labels
 

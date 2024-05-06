@@ -1,7 +1,7 @@
 import numpy as np
 import math
 
-SAMPLE_FREQ = 4
+SAMPLE_FREQ = 8
 NUMBER_FRETS = 22
 
 # E2 to E6, the range of a standard tuned guitar with 24 frets.
