@@ -2,6 +2,13 @@ import cv2
 import mediapipe as mp
 import numpy as np
 import pyaudio
+import wave
+from moviepy.editor import VideoFileClip
+import os
+import sys
+
+# ignore stderror
+os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;udp'
 
 class HandTracker:
     def __init__(self):
@@ -27,7 +34,8 @@ class HandTracker:
         image = cv2.imread(image_path)
 
         # Track hands in the image
-        return self._track_hands(image)
+        canvas, data = self._track_hands(image)
+        return canvas
 
     def track_hands_live_stream(self):
         # Start capturing video from webcam
@@ -82,7 +90,7 @@ class HandTracker:
 
     def get_sound_data(self):
         # Ends up acting like a refresh rate on the video stream ig?
-        duration_sec = 0.5
+        duration_sec = 0.0001
         # Function to get sound data from the live stream for a specified duration
         num_frames = int(44100 / 1024 * duration_sec)
         sound_data = b''
@@ -114,9 +122,36 @@ class HandTracker:
             return None
 
 
-    def track_hands_video(self, video_path):
+    def _extract_audio(self, video_path, audio_output_path):
+        video_clip = VideoFileClip(video_path)
+        audio_clip = video_clip.audio
+        audio_clip.write_audiofile(audio_output_path)
+
+    def track_hands_video(self, video_path, audio_output_path, output_path):
+        # Open devnull for writing
+        devnull = open(os.devnull, 'w')
+        # Redirect stderr to devnull
+        sys.stderr = devnull
+
+        # extract and save audio for later processing
+        self._extract_audio(video_path, audio_output_path)
+
         # Start capturing video from saved file
+        print("Extracting hand data (DISREGARD CODEC ERRORS) ...")
+
         vidcap = cv2.VideoCapture(video_path)
+
+        # Initialize list to store hand tracking data
+        hand_data = []
+
+        # Get the video properties of the input video
+        width = int(vidcap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(vidcap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        fps = vidcap.get(cv2.CAP_PROP_FPS)
+        codec = int(vidcap.get(cv2.CAP_PROP_FOURCC))
+
+        # Define the video writer for the output video
+        out = cv2.VideoWriter(output_path, codec, fps, (width, height))
 
         while True:
             ret, frame = vidcap.read()
@@ -124,18 +159,29 @@ class HandTracker:
                 break
 
             # Track hands in the frame
-            frame_with_hands = self._track_hands(frame)
+            frame_with_hands, frame_hand_data = self._track_hands(frame)
 
-            # Display the frame
-            cv2.imshow('Hand Tracking', frame_with_hands)
+            # Store the processed frame with hands
+            hand_data.append(frame_hand_data)
+
+            # Write the processed frame to the output video
+            out.write(frame_with_hands)
+
+            # Display the frame (optional)
+            # cv2.imshow('Hand Tracking', frame_with_hands)
 
             # Exit loop by pressing 'q'
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
-        # Release the video capture and close windows
+        # Release the video capture and writer, restore stdout, and close windows
+        print("Hand data acquired, saving video")
         vidcap.release()
+        out.release()
         cv2.destroyAllWindows()
+        sys.stderr = sys.__stderr__
+        return hand_data
+
 
     def _track_hands(self, frame):
         # Convert the BGR image to RGB
@@ -147,11 +193,14 @@ class HandTracker:
         # Create a blank canvas to draw only the landmarks
         landmarks_canvas = np.zeros_like(frame)
 
+        hand_data = 0
+
         # Draw landmarks on the canvas
         if processFrames.multi_hand_landmarks:
             for hand_landmarks in processFrames.multi_hand_landmarks:
                 # Draw landmarks on the canvas
                 self.mpdrawing.draw_landmarks(landmarks_canvas, hand_landmarks, self.mphands.HAND_CONNECTIONS)
+                hand_data = hand_landmarks
 
         # Return the canvas with only the landmarks
-        return landmarks_canvas
+        return landmarks_canvas, hand_data

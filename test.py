@@ -11,12 +11,14 @@ cv2.imshow('Hand Tracking - Image', image_with_hands)
 cv2.waitKey(0)  # Wait until a key is pressed
 cv2.destroyAllWindows()
 '''
-
+'''
 # Track hands in a live stream
 tracker.track_hands_live_stream()
+'''
 
-'''
+
 # Track hands in a saved video
-video_path = 'tempImage/testVid.mp4'
-tracker.track_hands_video(video_path)
-'''
+video_path = 'tempImage/testVid-1.mp4'
+output_path = 'tempImage/tracked-1.mp4'
+audio_path = 'tempImage/tracked-1.wav'
+data = tracker.track_hands_video(video_path, audio_path, output_path)
