@@ -35,7 +35,7 @@ def process_frame(frame):
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
     # Apply Canny edge detection
-    edges = cv2.Canny(gray, 100, 200)
+    edges = cv2.Canny(gray, 50, 150)
 
     # Apply Hough Line Segment Transformation
     lines = cv2.HoughLinesP(edges, 1, np.pi / 180, 100, minLineLength=175, maxLineGap=75)
@@ -49,6 +49,11 @@ def process_frame(frame):
     return frame
 
 def process_images(folder_path, output_folder):
+    # Check if the input folder exists
+    if not os.path.exists(folder_path):
+        print(f"Error: The folder '{folder_path}' does not exist.")
+        return  # Stop the function if the folder doesn't exist
+
     # Ensure output folder exists
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
@@ -63,6 +68,10 @@ def process_images(folder_path, output_folder):
             image = cv2.imread(image_path)
 
             if image is not None:
+                new_width = int(image.shape[1] * 4)
+                new_height = image.shape[0]
+                image = cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_LINEAR)
+
                 # Process the frame for Hough transformation
                 image = process_frame(image)
 
@@ -73,8 +82,10 @@ def process_images(folder_path, output_folder):
                 output_path = os.path.join(output_folder, filename)
                 cv2.imwrite(output_path, image)
                 print(f"Processed and saved {output_path}")
+            else:
+                print(f"Warning: Unable to load image '{image_path}'. Skipping...")
 
 if __name__ == "__main__":
-    folder_path = 'path_to_your_input_folder'  # Update this to your folder path
-    output_folder = 'path_to_your_output_folder'  # Update this to your desired output folder
+    folder_path = 'chord_images'  # Update this to your folder path
+    output_folder = 'augment_overlay'  # Update this to your desired output folder
     process_images(folder_path, output_folder)
