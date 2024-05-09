@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-def auto_canny_and_hough(frame, initial_threshold1=100, initial_threshold2=200, desired_line_count=10, max_iterations=5):
+def auto_canny_and_hough(frame, initial_threshold1=100, initial_threshold2=150, desired_line_count=10, max_iterations=5):
     # Adjust the thresholds based on the number of detected lines
     threshold1, threshold2 = initial_threshold1, initial_threshold2
     iteration = 0
@@ -12,7 +12,7 @@ def auto_canny_and_hough(frame, initial_threshold1=100, initial_threshold2=200, 
         edges = cv2.Canny(frame, threshold1, threshold2)
 
         # Apply Hough Line Segment Transformation
-        lines = cv2.HoughLinesP(edges, 1, np.pi / 180, 100, minLineLength=50, maxLineGap=10)
+        lines = cv2.HoughLinesP(edges, 1, np.pi / 180, 100, minLineLength=175, maxLineGap=75)
         
         line_count = len(lines) if lines is not None else 0
         print(f"Iteration {iteration}: Thresholds=({threshold1}, {threshold2}), Lines Detected={line_count}")
@@ -21,11 +21,11 @@ def auto_canny_and_hough(frame, initial_threshold1=100, initial_threshold2=200, 
         if line_count == desired_line_count:
             break
         elif line_count < desired_line_count:
-            threshold1 -= 10  # Decrease threshold to make edge detection less strict
-            threshold2 -= 20
+            threshold1 -= 50  # Decrease threshold to make edge detection less strict
+            threshold2 -= 50
         else:
-            threshold1 += 10  # Increase threshold to make edge detection more strict
-            threshold2 += 20
+            threshold1 += 50  # Increase threshold to make edge detection more strict
+            threshold2 += 50
 
         iteration += 1
 
@@ -42,7 +42,12 @@ def auto_canny_and_hough(frame, initial_threshold1=100, initial_threshold2=200, 
     return frame, edges
 
 # Example usage with an image
-frame = cv2.imread('path_to_your_image.jpg')
+
+frame = cv2.imread('chord_images/A628.png')
+new_width = int(frame.shape[1] * 4)
+new_height = frame.shape[0]
+frame = cv2.resize(frame, (new_width, new_height), interpolation=cv2.INTER_LINEAR)
+
 processed_frame, edges = auto_canny_and_hough(frame)
 cv2.imshow("Processed Frame", processed_frame)
 cv2.imshow("Edges", edges)
