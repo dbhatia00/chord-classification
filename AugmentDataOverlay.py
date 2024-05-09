@@ -1,9 +1,9 @@
 import cv2
 import mediapipe as mp
 import numpy as np
-import pyaudio
+import os
 
-# This file overlays hough lines and handtracker skeleton over the webcam live feed
+# This file augments the visual dataset by overlaying hough lines and handtracker skeletons
 
 class HandTracker:
     def __init__(self):
@@ -12,16 +12,9 @@ class HandTracker:
         self.mpdrawing = mp.solutions.drawing_utils
         self.hands = self.mphands.Hands(min_detection_confidence=0.5, min_tracking_confidence=0.5)
 
-        # Initialize PyAudio
-        self.audio = pyaudio.PyAudio()
-        self.stream = self.audio.open(format=pyaudio.paInt16, channels=1, rate=44100, input=True, frames_per_buffer=1024)
-
     def __del__(self):
         # Release resources
         self.hands.close()
-        self.stream.stop_stream()
-        self.stream.close()
-        self.audio.terminate()
 
     def track_hands(self, frame):
         # Convert the BGR image to RGB
@@ -36,21 +29,6 @@ class HandTracker:
                 self.mpdrawing.draw_landmarks(frame, hand_landmarks, self.mphands.HAND_CONNECTIONS)
 
         return frame
-
-    def get_sound_data(self):
-        # Function to get sound data from the live stream for a specified duration
-        duration_sec = 0.5
-        num_frames = int(44100 / 1024 * duration_sec)
-        sound_data = b''
-
-        for _ in range(num_frames):
-            sound_data += self.stream.read(1024)
-
-        return sound_data
-
-    def process_sound(self, sound_data):
-        # Function to process sound data when no significant change in hand position is detected
-        pass
 
 def process_frame(frame):
     # Convert to grayscale for easier processing
@@ -70,36 +48,33 @@ def process_frame(frame):
 
     return frame
 
-def main():
-    # Initialize video capture (0 = default camera)
-    cap = cv2.VideoCapture(0)
+def process_images(folder_path, output_folder):
+    # Ensure output folder exists
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
 
     # Initialize the hand tracker
     hand_tracker = HandTracker()
 
-    while cap.isOpened():
-        ret, frame = cap.read()  # Read a frame
+    # Process each image in the folder
+    for filename in os.listdir(folder_path):
+        if filename.endswith(".jpg") or filename.endswith(".png"):  # Add other file types if needed
+            image_path = os.path.join(folder_path, filename)
+            image = cv2.imread(image_path)
 
-        if not ret:
-            print("Failed to grab frame")
-            break
+            if image is not None:
+                # Process the frame for Hough transformation
+                image = process_frame(image)
 
-        # Process the frame for Hough transformation
-        frame = process_frame(frame)
+                # Track hands and overlay the hand skeleton
+                image = hand_tracker.track_hands(image)
 
-        # Track hands and overlay the hand skeleton
-        frame = hand_tracker.track_hands(frame)
-
-        # Display the frame
-        cv2.imshow('Hand and Line Tracking', frame)
-
-        # Exit on pressing the escape key
-        if cv2.waitKey(1) & 0xFF == 27:
-            break
-
-    # Release the capture and close all windows
-    cap.release()
-    cv2.destroyAllWindows()
+                # Save the processed image
+                output_path = os.path.join(output_folder, filename)
+                cv2.imwrite(output_path, image)
+                print(f"Processed and saved {output_path}")
 
 if __name__ == "__main__":
-    main()
+    folder_path = 'path_to_your_input_folder'  # Update this to your folder path
+    output_folder = 'path_to_your_output_folder'  # Update this to your desired output folder
+    process_images(folder_path, output_folder)
