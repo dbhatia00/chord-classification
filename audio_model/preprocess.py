@@ -49,6 +49,8 @@ def load_sample(label, min, max):
   start_time = label['time']
   end_time = label['time'] + (1.0 / SAMPLE_FREQ)
   samples = signal[int(start_time * sample_rate) : int(end_time * sample_rate)]
+  if samples.size % 2 == 1:
+    samples = samples[:-1]
 
   # fft = scipy.fft.rfft(samples)
   # xf = scipy.fft.rfftfreq(len(samples), 1 / sample_rate)
@@ -59,21 +61,28 @@ def load_sample(label, min, max):
   # plt.xlim([0, 500])
   # plt.show()
 
-  num_coefficients = 750 # Size of mfcc array
+  num_coefficients = 150 # Size of mfcc array
   min_hz = 0
-  max_hz = 5000
+  max_hz = 3000
 
-  complex_spectrum= np.fft.fft(samples)
+  complex_spectrum = np.fft.fft(samples)
+  complex_spectrum = complex_spectrum
+  # real = complex_spectrum.real
+  # imag = complex_spectrum.imag
+  # result = np.zeros((real.shape[0], 2), dtype=real.dtype)
+  # result[:, 0] = real
+  # result[:, 1] = imag
   # xf = scipy.fft.fftfreq(len(samples), 1 / sample_rate)
   power_spectrum = abs(complex_spectrum) ** 2
+  filtered_spectrum = np.where(power_spectrum == 0.0, 1e-20, power_spectrum)
   global mel_filter
   if mel_filter is None:
     mel_filter = mel_filter_bank(power_spectrum.shape[0], num_coefficients, min_hz, max_hz)
   filtered_spectrum = np.dot(power_spectrum[:5511], mel_filter[:5511])
   filtered_spectrum = np.where(filtered_spectrum == 0.0, 1e-10, filtered_spectrum)
   log_spectrum = np.log(filtered_spectrum)
-  dct_spectrum = scipy.fft.dct(log_spectrum, type=2) # MFCC
-  dct_spectrum = dct_spectrum
+  # dct_spectrum = scipy.fft.dct(log_spectrum, type=2) # MFCC
+  # dct_spectrum = dct_spectrum
   # plt.plot(xf[:5511], complex_spectrum[:5511])
   # plt.show()
   # plt.plot(xf[:5511], power_spectrum[:5511])
@@ -82,7 +91,7 @@ def load_sample(label, min, max):
   # plt.show()
   # plt.plot(xf[:5511], dct_spectrum[:5511])
   # plt.show()
-  return dct_spectrum
+  return log_spectrum
 
 # Generates ffts for given labels.
 def load_samples(labels):
@@ -91,9 +100,6 @@ def load_samples(labels):
   min = np.min(signal)
   max = np.max(signal)
 
-  # Calculate size of array based on first sample.
-  fft = load_sample(labels[0], min, max)
-  sample_ffts = np.zeros((len(labels), fft.shape[0]))
   sample_ffts = []
 
   print("Generating FFTs...")

@@ -11,9 +11,10 @@ from tqdm import tqdm
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def main(
-    batch_size: Optional[int] = typer.Option(16),
-    epochs: Optional[int] = typer.Option(100),
-    lr: Optional[float] = typer.Option(5e-5)):
+    batch_size: Optional[int] = typer.Option(64),
+    epochs: Optional[int] = typer.Option(200),
+    # lr: Optional[float] = typer.Option(5e-5)):
+    lr: Optional[float] = typer.Option(2e-4)):
 
     print("getting data...")
     # Load data
@@ -28,11 +29,12 @@ def main(
     acc = metrics.MultilabelAccuracy()
     acc_hamming = metrics.MultilabelAccuracy(criteria="hamming")
     acc_contain = metrics.MultilabelAccuracy(criteria="contain")
+    acc_fp = metrics.MultilabelAccuracy(criteria="contain")
     opt = optim.Adam(audio_model.parameters(), lr=lr)
     # opt = optim.SGD(audio_model.parameters(), lr=lr, momentum=0.9)
 
     running_loss = 0.0
-    x_total = 0
+    x_total = 0.0
     for e in range(epochs):
       print(f"Epoch {e}:")
       audio_model.train()
@@ -53,16 +55,19 @@ def main(
         acc.update(outputs, labels)
         acc_hamming.update(outputs, labels)
         acc_contain.update(outputs, labels)
+        acc_fp.update(outputs, (1 - labels))
 
       print(f"Train loss: {running_loss / x_total}")
       print(f"Train accuracy: {acc.compute()}")
       print(f"Train hamming accuracy: {acc_hamming.compute()}")
       print(f"Train contain accuracy: {acc_contain.compute()}")
+      print(f"Train false positive rate: {acc_fp.compute()}")
       running_loss = 0.0
-      x_total = 0
+      x_total = 0.0
       acc.reset()
       acc_hamming.reset()
       acc_contain.reset()
+      acc_fp.reset()
       
       audio_model.eval()
       for i, data in enumerate(test_loader):
@@ -72,15 +77,25 @@ def main(
 
         outputs = audio_model(inputs)
         loss = loss_func(outputs, labels)
+
+        running_loss += loss.item() * inputs.shape[0]
+        x_total += inputs.shape[0]
         acc.update(outputs, labels)
         acc_hamming.update(outputs, labels)
         acc_contain.update(outputs, labels)
+        acc_fp.update(outputs, (1 - labels))
 
+      print(f"Test loss: {running_loss / x_total}")
       print(f"Test accuracy: {acc.compute()}")
       print(f"Test hamming accuracy: {acc_hamming.compute()}")
       print(f"Test contain accuracy: {acc_contain.compute()}")
+      print(f"Test false positive rate: {acc_fp.compute()}")
+      running_loss = 0.0
+      x_total = 0.0
+      acc.reset()
       acc_hamming.reset()
       acc_contain.reset()
+      acc_fp.reset()
 
 if __name__ == '__main__':
   typer.run(main)
