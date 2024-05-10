@@ -16,9 +16,9 @@ cv2.destroyAllWindows()
 tracker.track_hands_live_stream()
 '''
 
-
 # Track hands in a saved video
 video_path = 'tempImage/testVid-1.mp4'
-output_path = 'tempImage/tracked-1.mp4'
-audio_path = 'tempImage/tracked-1.wav'
+output_path = 'vid_dump/tracked-1.mp4'
+audio_path = 'vid_dump/tracked-1.wav'
 data = tracker.track_hands_video(video_path, audio_path, output_path)
+
