@@ -16,8 +16,6 @@ class GuitarDataset(Dataset):
   
   def __getitem__(self, index):
     x = self.x[index]
-    # x = np.expand_dims(x, axis=0)
-    # x = np.swapaxes(x, 0, 1)
     y= self.y[index]
 
     return x, y

@@ -54,11 +54,31 @@ def load_sample(signal, sample_rate, time_range):
 def load_samples(labels):
   print("Generating MFCCs...")
   mfccs = []
+  processed_labels = []
+  mfcc_pairs = []
+  label_pairs = []
   curr_file = None
   sample_rate = signal = max = None
 
   for i in tqdm(range(len(labels))):
     if labels[i]['file'] != curr_file:
+      # Generate pairs
+      if i != 0:
+        mfccs = np.stack(mfccs)
+        num_per_window = 3 # Must be odd
+        window_arrays = []
+        for j in range(num_per_window):
+          end_index = -(num_per_window-j-1)
+          if end_index == 0:
+            end_index = mfccs.shape[0]
+          window_arrays.append(mfccs[j:end_index])
+        mfccs = np.hstack(window_arrays)
+        mfcc_pairs.append(mfccs)
+        label_pairs.extend(processed_labels[num_per_window//2:-num_per_window//2+1])
+        mfccs = []
+        processed_labels = []
+
+      # Normalize audio
       sample_rate, signal = scipy.io.wavfile.read(labels[i]['file'])
       signal = signal.astype(np.float32)
       max = np.max(signal)
@@ -67,8 +87,9 @@ def load_samples(labels):
 
     mfcc = load_sample(signal, sample_rate, get_time_range(labels[i]['time']))
     mfccs.append(mfcc)
+    processed_labels.append(labels[i])
   
-  return np.stack(mfccs)
+  return np.vstack(mfcc_pairs), label_pairs
 
 def load_samples_from_file(filename):
   sample_rate, signal = scipy.io.wavfile.read(filename)
@@ -176,7 +197,7 @@ def generate_labels():
 
 def generate_data():
     labels = generate_labels()
-    samples = load_samples(labels)
+    samples, labels = load_samples(labels)
 
     print("Saving preprocessed data...")
     with open('data.pkl', 'wb') as out:
@@ -193,6 +214,14 @@ def get_data(batch_size, test_split):
   with open('data.pkl', 'rb') as data:
     x, y = pickle.load(data)
 
+  # Create triplets of samples
+  # x_next = x[1:]
+  # y_next = y[1:]
+  # x_next2 = x[2:]
+  # y_next2 = y[2:]
+  # x = np.hstack([x[:-2], x_next[:-1], x_next2])
+  # y = y_next2
+  
   split = math.floor(x.shape[0] * (1 - test_split))
   idx = np.random.permutation(x.shape[0])
   x = x[idx]
