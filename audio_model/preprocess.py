@@ -20,94 +20,82 @@ def get_fret(string, midi_note):
   index = -string + 6
   return round(midi_note - open_midi_notes[index])
 
-def normalize_sample(samples, sample_rate):
-  # Scale by max value in the dataset
-  # max_value = np.max(samples)
-  # samples = samples * 100 / max_value
-
-  # mean = np.mean(samples, axis=0)
-  # std_dev = np.std(samples, axis=0)
-  # samples = (samples - mean) / std_dev
-
-  mel_filter = librosa.filters.mel(n_fft=samples.shape[0]*2, sr=sample_rate, n_mels=128, norm=None)
-  # for sample in samples:
-  samples = mel_filter.dot(samples)
-  plt.plot(samples)
-  plt.legend(labels=['Hz', 'mel'])
-
-  # TODO Chop off tons of higher frequencies
-  return samples
-
 # Kind of a hack
 mel_filter = None
 
-def load_sample(label, min, max):
-  sample_rate, signal = scipy.io.wavfile.read(label['file'])
-  # signal = (signal - min) / (max - min)
-  signal = signal / max
+def get_time_range(time):
+  start_time = time
+  end_time = time + (1.0 / SAMPLE_FREQ)
+  return (start_time, end_time)
 
-  start_time = label['time']
-  end_time = label['time'] + (1.0 / SAMPLE_FREQ)
-  samples = signal[int(start_time * sample_rate) : int(end_time * sample_rate)]
+def load_sample(signal, sample_rate, time_range):
+  samples = signal[int(time_range[0]* sample_rate) : int(time_range[1]* sample_rate)]
   if samples.size % 2 == 1:
     samples = samples[:-1]
-
-  # fft = scipy.fft.rfft(samples)
-  # xf = scipy.fft.rfftfreq(len(samples), 1 / sample_rate)
-  # fft = normalize_sample(fft, sample_rate)
-
-  # print(xf[0:10])
-  # plt.plot(xf, yf)
-  # plt.xlim([0, 500])
-  # plt.show()
 
   num_coefficients = 150 # Size of mfcc array
   min_hz = 0
   max_hz = 3000
 
   complex_spectrum = np.fft.fft(samples)
-  complex_spectrum = complex_spectrum
-  # real = complex_spectrum.real
-  # imag = complex_spectrum.imag
-  # result = np.zeros((real.shape[0], 2), dtype=real.dtype)
-  # result[:, 0] = real
-  # result[:, 1] = imag
   # xf = scipy.fft.fftfreq(len(samples), 1 / sample_rate)
   power_spectrum = abs(complex_spectrum) ** 2
   filtered_spectrum = np.where(power_spectrum == 0.0, 1e-20, power_spectrum)
   global mel_filter
   if mel_filter is None:
     mel_filter = mel_filter_bank(power_spectrum.shape[0], num_coefficients, min_hz, max_hz)
-  filtered_spectrum = np.dot(power_spectrum[:5511], mel_filter[:5511])
+  filtered_spectrum = np.dot(power_spectrum, mel_filter)
   filtered_spectrum = np.where(filtered_spectrum == 0.0, 1e-10, filtered_spectrum)
   log_spectrum = np.log(filtered_spectrum)
-  # dct_spectrum = scipy.fft.dct(log_spectrum, type=2) # MFCC
-  # dct_spectrum = dct_spectrum
-  # plt.plot(xf[:5511], complex_spectrum[:5511])
-  # plt.show()
-  # plt.plot(xf[:5511], power_spectrum[:5511])
-  # plt.show()
-  # plt.plot(xf[:5511], log_spectrum[:5511])
-  # plt.show()
-  # plt.plot(xf[:5511], dct_spectrum[:5511])
-  # plt.show()
-  return log_spectrum
+  dct_spectrum = scipy.fft.dct(log_spectrum, type=2) # MFCC
+  return dct_spectrum 
 
-# Generates ffts for given labels.
+# Generates mfccs for given labels.
 def load_samples(labels):
-  sample_rate, signal = scipy.io.wavfile.read(labels[0]['file'])
+  print("Generating MFCCs...")
+  mfccs = []
+  curr_file = None
+  sample_rate = signal = max = None
+
+  for i in tqdm(range(len(labels))):
+    if labels[i]['file'] != curr_file:
+      sample_rate, signal = scipy.io.wavfile.read(labels[i]['file'])
+      signal = signal.astype(np.float32)
+      max = np.max(signal)
+      signal = signal / max
+      curr_file = labels[i]['file']
+
+    mfcc = load_sample(signal, sample_rate, get_time_range(labels[i]['time']))
+    mfccs.append(mfcc)
+  
+  return np.stack(mfccs)
+
+def load_samples_from_file(filename):
+  sample_rate, signal = scipy.io.wavfile.read(filename)
   signal = signal.astype(np.float32)
-  min = np.min(signal)
   max = np.max(signal)
 
-  sample_ffts = []
+  mfccs = []
 
-  print("Generating FFTs...")
-  for i in tqdm(range(len(labels))):
-    fft = load_sample(labels[i], min, max)
-    sample_ffts.append(fft)
+  print("Generating MFCCs...")
+  mfccs = []
+
+  file_duration = int(signal.shape[0] / sample_rate)
+  num_clips = file_duration * SAMPLE_FREQ
+
+  sample_rate, signal = scipy.io.wavfile.read(filename)
+  signal = signal.astype(np.float32)
+  if len(signal.shape) > 1:
+    signal = signal[:, 0]
+  max = np.max(signal)
+  signal = signal / max
+
+  for i in tqdm(range(num_clips)):
+    time = float(i) / SAMPLE_FREQ
+    mfcc = load_sample(signal, sample_rate, get_time_range(time))
+    mfccs.append(mfcc)
   
-  return np.stack(sample_ffts)
+  return np.stack(mfccs)
 
 # Labels include file, timestamp, and strings. 
 # Strings is an array of six fret values. [0] is string 6.

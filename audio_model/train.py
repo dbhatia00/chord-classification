@@ -12,9 +12,9 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def main(
     batch_size: Optional[int] = typer.Option(64),
-    epochs: Optional[int] = typer.Option(200),
-    # lr: Optional[float] = typer.Option(5e-5)):
-    lr: Optional[float] = typer.Option(2e-4)):
+    epochs: Optional[int] = typer.Option(100),
+    lr: Optional[float] = typer.Option(1e-4),
+    out: Optional[str] = 'model.pt'):
 
     print("getting data...")
     # Load data
@@ -96,6 +96,9 @@ def main(
       acc_hamming.reset()
       acc_contain.reset()
       acc_fp.reset()
+    
+    # Save the model
+    torch.save(audio_model.state_dict(), out)
 
 if __name__ == '__main__':
   typer.run(main)
