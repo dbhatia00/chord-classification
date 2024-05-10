@@ -12,7 +12,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def main(
     batch_size: Optional[int] = typer.Option(64),
-    epochs: Optional[int] = typer.Option(100),
+    epochs: Optional[int] = typer.Option(200),
     lr: Optional[float] = typer.Option(1e-4),
     out: Optional[str] = 'model.pt'):
 

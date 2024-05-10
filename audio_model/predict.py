@@ -21,9 +21,14 @@ def main(model: Optional[str] = typer.Option('model.pt'),
     preds.append(pred.detach().numpy())
   preds = np.vstack(preds)
 
-  # with open(out, 'w') as file:
-  #   file.write(str(preds))
+  notes = []
+  for p in preds:
+    note = np.where(p >= 0.3)
+    notes.append(note[0].tolist())
+
   np.savetxt(out, preds)
+  with open('notes.txt', 'w') as file:
+    file.write(str(notes))
 
 
 if __name__ == '__main__':
