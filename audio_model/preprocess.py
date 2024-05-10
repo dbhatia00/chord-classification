@@ -4,7 +4,7 @@ import scipy
 import matplotlib.pyplot as plt
 import numpy as np
 import math
-from util import NUMBER_FRETS, SAMPLE_FREQ, mel_filter_bank
+from util import NUMBER_FRETS, SAMPLE_FREQ, WINDOW_SIZE, mel_filter_bank
 import pickle
 from tqdm import tqdm
 from dataset import GuitarDataset
@@ -65,16 +65,15 @@ def load_samples(labels):
       # Generate pairs
       if i != 0:
         mfccs = np.stack(mfccs)
-        num_per_window = 3 # Must be odd
         window_arrays = []
-        for j in range(num_per_window):
-          end_index = -(num_per_window-j-1)
+        for j in range(WINDOW_SIZE):
+          end_index = -(WINDOW_SIZE-j-1)
           if end_index == 0:
             end_index = mfccs.shape[0]
           window_arrays.append(mfccs[j:end_index])
         mfccs = np.hstack(window_arrays)
         mfcc_pairs.append(mfccs)
-        label_pairs.extend(processed_labels[num_per_window//2:-num_per_window//2+1])
+        label_pairs.extend(processed_labels[WINDOW_SIZE//2:-WINDOW_SIZE//2+1])
         mfccs = []
         processed_labels = []
 
@@ -116,7 +115,15 @@ def load_samples_from_file(filename):
     mfcc = load_sample(signal, sample_rate, get_time_range(time))
     mfccs.append(mfcc)
   
-  return np.stack(mfccs)
+  mfccs = np.stack(mfccs)
+  window_arrays = []
+  for j in range(WINDOW_SIZE):
+    end_index = -(WINDOW_SIZE-j-1)
+    if end_index == 0:
+      end_index = mfccs.shape[0]
+    window_arrays.append(mfccs[j:end_index])
+  mfccs = np.hstack(window_arrays)
+  return mfccs
 
 # Labels include file, timestamp, and strings. 
 # Strings is an array of six fret values. [0] is string 6.

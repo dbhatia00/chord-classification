@@ -5,6 +5,8 @@ from audio_model import AudioModel
 from tqdm import tqdm
 from typing import Optional
 import numpy as np
+import os
+from util import SAMPLE_FREQ, WINDOW_SIZE
 
 def main(model: Optional[str] = typer.Option('model.pt'), 
          filepath: Optional[str] = typer.Option('file.wav'), 
@@ -16,7 +18,6 @@ def main(model: Optional[str] = typer.Option('model.pt'),
 
   samples = load_samples_from_file(filepath)
   samples = torch.tensor(samples).type(torch.float32)
-  samples = torch.hstack([samples[:-1], samples[1:]])
   preds = []
   for i in tqdm(range(samples.shape[0])):
     pred = audio_model(samples[i])
@@ -28,9 +29,19 @@ def main(model: Optional[str] = typer.Option('model.pt'),
     note = np.where(p >= 0.3)
     notes.append(note[0].tolist())
 
-  np.savetxt(raw_out, preds)
-  with open(notes_out, 'w') as file:
-    file.write(str(notes))
+  os.makedirs(os.path.dirname(raw_out), exist_ok=True)
+  open(raw_out, 'w').close()
+  with open(raw_out, 'a') as file:
+    for i, pred in enumerate(preds):
+      time = (i + WINDOW_SIZE//2) / SAMPLE_FREQ
+      file.write(f'{time}: {pred.tolist()}\n')
+
+  os.makedirs(os.path.dirname(notes_out), exist_ok=True)
+  open(notes_out, 'w').close()
+  with open(notes_out, 'a') as file:
+    for i, note in enumerate(notes):
+      time = (i + WINDOW_SIZE//2) / SAMPLE_FREQ
+      file.write(f'{time}: {note}\n')
 
 
 if __name__ == '__main__':

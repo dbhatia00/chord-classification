@@ -1,8 +1,9 @@
 import numpy as np
 import math
 
-SAMPLE_FREQ = 8
+SAMPLE_FREQ = 8 # Number of samples per second to generate.
 NUMBER_FRETS = 22
+WINDOW_SIZE = 3 # Number of samples to combine for each prediction. Must be odd.
 
 # E2 to E6, the range of a standard tuned guitar with 24 frets.
 note_pitches = [82.41, 87.31, 92.50, 98.00, 103.83, 110.0, 116.54, 123.47,
