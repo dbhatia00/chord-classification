@@ -22,11 +22,7 @@ def reorder_probabilities(probability_tensor, threshold):
         # Get the indices where probabilities are above the threshold
         above_threshold_indices = np.where(timestamp_probs > threshold)
         
-        # Reorder the probabilities according to the note order
-        reordered_timestamp_probs = [timestamp_probs[string_index, fret_index] 
-                                      for string_index, fret_index in zip(*above_threshold_indices)]
-        
-        # Sum up the probabilities for duplicate notes across different strings
+        # Sum up the probabilities for each unique note without considering duplicates
         summed_probs = np.zeros(len(note_strings))
         for string_index, fret_index in zip(*above_threshold_indices):
             note = guitar_notes[string_index][fret_index]
