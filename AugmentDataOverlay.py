@@ -78,16 +78,19 @@ def hough_transform_and_join(frame, hand_frame, initial_threshold1=350, initial_
 
 def calculate_angle(p1, p2):
     # Calculate the angle from horizontal
-    return np.degrees(np.arctan2(p2[1] - p1[1], p2[0] - p1[0]))
+    return -np.degrees(np.arctan2(p2[1] - p1[1], p2[0] - p1[0]))
 
 def rotate_image(image, angle, center):
     # Get the rotation matrix
     rot_mat = cv2.getRotationMatrix2D(center, angle, 1.0)
+
+
     # Perform the rotation
     return cv2.warpAffine(image, rot_mat, (image.shape[1], image.shape[0]))
 
 def process_images_with_rotation_and_cropping(folder_path, output_folder_combination, output_folder_hand, hand_tracker):
-    buffer_size = 0  # Buffer of 100 pixels
+    desired_width = 1219  # Desired width of the cropped image
+    desired_height = 500  # Desired height of the cropped image
 
     for filename in os.listdir(folder_path):
         if filename.endswith(".jpg") or filename.endswith(".png"):
@@ -99,37 +102,36 @@ def process_images_with_rotation_and_cropping(folder_path, output_folder_combina
                 hand_image, landmarks_list = hand_tracker.track_hands(image)
 
                 if len(landmarks_list) >= 2:
-                    # Assuming the first two sets of landmarks are the two hands
-                    left_hand = sorted(landmarks_list, key=lambda x: np.mean([lm[0] for lm in x]))[0]
-                    right_hand = sorted(landmarks_list, key=lambda x: np.mean([lm[0] for lm in x]))[1]
+                    hands = sorted(landmarks_list, key=lambda x: np.mean([lm[0] for lm in x]))
+                    left_hand, right_hand = hands[0], hands[1]
 
                     # Calculate centroids of each hand
-                    left_hand_centroid = (np.mean([lm[0] for lm in left_hand]), np.mean([lm[1] for lm in left_hand]))
-                    right_hand_centroid = (np.mean([lm[0] for lm in right_hand]), np.mean([lm[1] for lm in right_hand]))
+                    left_centroid = (np.mean([lm[0] for lm in left_hand]), np.mean([lm[1] for lm in left_hand]))
+                    right_centroid = (np.mean([lm[0] for lm in right_hand]), np.mean([lm[1] for lm in right_hand]))
+
+                    # Midpoint between the hands
+                    mid_point_y = int((left_centroid[1] + right_centroid[1]) / 2)
 
                     # Calculate the angle for rotation
-                    angle = calculate_angle(left_hand_centroid, right_hand_centroid)
+                    angle = calculate_angle(left_centroid, right_centroid)
+                    center = (left_centroid[0], mid_point_y)  # Rotate about the left hand and the midpoint vertically
 
-                    # Calculate the center point for rotation
-                    center = ((left_hand_centroid[0] + right_hand_centroid[0]) / 2, (left_hand_centroid[1] + right_hand_centroid[1]) / 2)
+                    # Rotate the image and the hands
+                    rotated_image = rotate_image(image_copy, -angle, center)
+                    rotated_hand_image = rotate_image(hand_image, -angle, center)
 
-                    # Rotate the image
-                    rotated_image = rotate_image(image_copy, angle, center)
-                    rotated_hand_image = rotate_image(hand_image, angle, center)
+                    # New coordinates of the left hand after rotation
+                    new_left_hand_x = int((left_centroid[0] - center[0]) * np.cos(np.radians(-angle)) - (left_centroid[1] - center[1]) * np.sin(np.radians(-angle)) + center[0])
 
-                    # After rotation, recalculate the position of left and right hands
-                    new_left_hand_x = int((left_hand_centroid[0] - center[0]) * np.cos(np.radians(-angle)) - (left_hand_centroid[1] - center[1]) * np.sin(np.radians(-angle)) + center[0])
-                    new_right_hand_x = int((right_hand_centroid[0] - center[0]) * np.cos(np.radians(-angle)) - (right_hand_centroid[1] - center[1]) * np.sin(np.radians(-angle)) + center[0])
+                    # Calculate the crop dimensions
+                    crop_x = max(new_left_hand_x, 0)
+                    crop_y = max(mid_point_y - desired_height // 2, 0)
+                    crop_width = min(desired_width, rotated_image.shape[1] - crop_x)
+                    crop_height = min(desired_height, rotated_image.shape[0] - crop_y)
 
-                    # Determine crop boundaries with buffer
-                    crop_x = int(max(min(new_left_hand_x, new_right_hand_x) - buffer_size, 0))
-                    crop_y = int(max(min([lm[1] for lm in left_hand + right_hand]) - buffer_size, 0))
-                    width = int(rotated_image.shape[1] - crop_x)
-                    height = int(min(max([lm[1] for lm in left_hand + right_hand]) + buffer_size, rotated_image.shape[0]) - crop_y)
-
-                    # Crop the image using the corrected integer indices
-                    cropped_image = rotated_image[crop_y:crop_y + height, crop_x:crop_x + width]
-                    cropped_hand_image = rotated_hand_image[crop_y:crop_y + height, crop_x:crop_x + width]
+                    # Crop the image to the desired dimensions
+                    cropped_image = rotated_image[crop_y:crop_y + crop_height, crop_x:crop_x + crop_width]
+                    cropped_hand_image = rotated_hand_image[crop_y:crop_y + crop_height, crop_x:crop_x + crop_width]
 
                     # Save image with only hand tracker overlay
                     output_path_hand = os.path.join(output_folder_hand, filename)
