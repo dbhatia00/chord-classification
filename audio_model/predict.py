@@ -16,6 +16,7 @@ def main(model: Optional[str] = typer.Option('model.pt'),
   audio_model.load_state_dict(torch.load(model))
   audio_model.eval()
 
+  # Generate predictions
   samples = load_samples_from_file(filepath)
   samples = torch.tensor(samples).type(torch.float32)
   preds = []
@@ -24,8 +25,18 @@ def main(model: Optional[str] = typer.Option('model.pt'),
     preds.append(pred.detach().numpy())
   preds = np.vstack(preds)
 
+  # Smooth the outputs
+  smoothed = []
+  smooth_width = 5 # Should be odd.
+  for i, p in enumerate(preds):
+    start_index = max(i-smooth_width//2, 0)  
+    end_index = min(i+smooth_width//2+1, preds.shape[0])
+    smoothed_frame = preds[start_index:end_index]
+    smoothed_frame = np.mean(smoothed_frame, axis=0)
+    smoothed.append(smoothed_frame)
+
   notes = []
-  for p in preds:
+  for p in smoothed:
     note = np.where(p >= 0.3)
     notes.append(note[0].tolist())
 
@@ -34,14 +45,14 @@ def main(model: Optional[str] = typer.Option('model.pt'),
   with open(raw_out, 'a') as file:
     for i, pred in enumerate(preds):
       time = (i + WINDOW_SIZE//2) / SAMPLE_FREQ
-      file.write(f'{time}: {pred.tolist()}\n')
+      file.write(f'{time:.3f}: {pred.tolist()}\n')
 
   os.makedirs(os.path.dirname(notes_out), exist_ok=True)
   open(notes_out, 'w').close()
   with open(notes_out, 'a') as file:
     for i, note in enumerate(notes):
       time = (i + WINDOW_SIZE//2) / SAMPLE_FREQ
-      file.write(f'{time}: {note}\n')
+      file.write(f'{time:.3f}: {note}\n')
 
 
 if __name__ == '__main__':
