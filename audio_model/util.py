@@ -1,7 +1,7 @@
 import numpy as np
 import math
 
-SAMPLE_FREQ = 8 # Number of samples per second to generate.
+SAMPLE_FREQ = 10 # Number of samples per second to generate.
 NUMBER_FRETS = 22
 WINDOW_SIZE = 3 # Number of samples to combine for each prediction. Must be odd.
 
