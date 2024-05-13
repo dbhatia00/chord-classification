@@ -7,12 +7,12 @@ from audio_model.util import note_strings
 # Function to generate probabilities tensor from a frame
 def generate_probabilities(frame):
     # Generate a 6x21 tensor of em
-    # TODO: Call actual model with frame
     em_chord = np.zeros((6, 21))
-    em_chord[3,1] = 1
-    em_chord[4,1] = 1
+    em_chord[3,2] = 0.8
+    em_chord[4,2] = 0.8
     return em_chord
 
+# Define the reorder_probabilities function
 def reorder_probabilities(probability_tensor, threshold):
     # Initialize a list to store the reordered probabilities
     reordered_probabilities = []
@@ -22,11 +22,7 @@ def reorder_probabilities(probability_tensor, threshold):
         # Get the indices where probabilities are above the threshold
         above_threshold_indices = np.where(timestamp_probs > threshold)
         
-        # Reorder the probabilities according to the note order
-        reordered_timestamp_probs = [timestamp_probs[string_index, fret_index] 
-                                      for string_index, fret_index in zip(*above_threshold_indices)]
-        
-        # Sum up the probabilities for duplicate notes across different strings
+        # Sum up the probabilities for each unique note without considering duplicates
         summed_probs = np.zeros(len(note_strings))
         for string_index, fret_index in zip(*above_threshold_indices):
             note = guitar_notes[string_index][fret_index]
@@ -40,7 +36,6 @@ def reorder_probabilities(probability_tensor, threshold):
     reordered_probabilities = np.array(reordered_probabilities)
     
     return reordered_probabilities
-
 
 def videoPredict(model: str = typer.Option('model.pt'), 
          filepath: str = typer.Option('file.wav'), 
@@ -66,7 +61,7 @@ def videoPredict(model: str = typer.Option('model.pt'),
         ret, frame = cap.read()
         if not ret:
             break
-        if frame_count % frame_interval == 0:
+        if (frame_count % frame_interval == 0) and (frame_count != 0):
             probabilities = generate_probabilities(frame)
             probabilities_tensor.append(probabilities)
             # Append the timestamp with the correct increment

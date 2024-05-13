@@ -4,20 +4,22 @@ import random
 import sys
 import argparse
 from HandTracker import HandTracker
+from seeFretboard import SeeFretboard
 from audio_model.predict import audioPredict
 from video_model.predict import videoPredict
+from Analyze import analyzeProbs
 
 def main(video_path):
     # Initialize tracker object
     tracker = HandTracker()
 
     # Generate a hash to use for intermediate representations
-    hash_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
+    hash_code = "P9XDC"# ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
 
     # Track hands in a saved video
     output_tracked_path = f'vid_dump/tracked-{hash_code}.mp4'
     audio_path = f'vid_dump/tracked-{hash_code}.wav'
-    data = tracker.track_hands_video(video_path, audio_path, output_tracked_path)
+    #data = tracker.track_hands_video(video_path, audio_path, output_tracked_path)
 
     # Do Audio Prediction
     print("Beginning Audio Prediction...")
@@ -30,9 +32,11 @@ def main(video_path):
 
     video_timestamps, video_probabilities = videoPredict(filepath=output_tracked_path, 
                                                          raw_out=f"./results/output-{hash_code}-video.txt")
-    print("Combining Data for best guess...")
+    print("Combining Data for best guesses...")   
+    
+    analyzeProbs(audio_timestamps, audio_probabilities, video_timestamps, audio_probabilities, hash_code)
 
-    print(f"Intermediate data available as {hash_code}")
+    print(f"Data available in results/FINAL-{hash_code}.txt")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Perform all video preprocessing and ")

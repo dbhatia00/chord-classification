@@ -45,9 +45,11 @@ def audioPredict(model: Optional[str] = typer.Option('model.pt'),
 
   os.makedirs(os.path.dirname(raw_out), exist_ok=True)
   open(raw_out, 'w').close()
+  times = []
   with open(raw_out, 'a') as file:
     for i, pred in enumerate(preds):
       time = (i + WINDOW_SIZE//2) / SAMPLE_FREQ
+      times.append(time)
       file.write(f'{time:.3f}: {pred.tolist()}\n')
 
   os.makedirs(os.path.dirname(notes_out), exist_ok=True)
@@ -57,7 +59,7 @@ def audioPredict(model: Optional[str] = typer.Option('model.pt'),
       time = (i + WINDOW_SIZE//2) / SAMPLE_FREQ
       file.write(f'{time:.3f}: {note}\n')
 
-  return time, notes
+  return times, preds
 
 
 if __name__ == '__main__':
