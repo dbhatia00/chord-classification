@@ -57,7 +57,7 @@ def audioPredict(model: Optional[str] = typer.Option('model.pt'),
       time = (i + WINDOW_SIZE//2) / SAMPLE_FREQ
       file.write(f'{time:.3f}: {note}\n')
 
-  return time, notes
+  return time, preds
 
 
 if __name__ == '__main__':

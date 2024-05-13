@@ -7,12 +7,12 @@ from audio_model.util import note_strings
 # Function to generate probabilities tensor from a frame
 def generate_probabilities(frame):
     # Generate a 6x21 tensor of em
-    # TODO: Call actual model with frame
     em_chord = np.zeros((6, 21))
-    em_chord[3,1] = 1
-    em_chord[4,1] = 1
+    em_chord[3,2] = 0.8
+    em_chord[4,2] = 0.8
     return em_chord
 
+# Define the reorder_probabilities function
 def reorder_probabilities(probability_tensor, threshold):
     # Initialize a list to store the reordered probabilities
     reordered_probabilities = []
@@ -36,7 +36,6 @@ def reorder_probabilities(probability_tensor, threshold):
     reordered_probabilities = np.array(reordered_probabilities)
     
     return reordered_probabilities
-
 
 def videoPredict(model: str = typer.Option('model.pt'), 
          filepath: str = typer.Option('file.wav'), 
