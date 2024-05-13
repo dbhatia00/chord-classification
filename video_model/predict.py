@@ -61,7 +61,7 @@ def videoPredict(model: str = typer.Option('model.pt'),
         ret, frame = cap.read()
         if not ret:
             break
-        if frame_count % frame_interval == 0:
+        if (frame_count % frame_interval == 0) and (frame_count != 0):
             probabilities = generate_probabilities(frame)
             probabilities_tensor.append(probabilities)
             # Append the timestamp with the correct increment
