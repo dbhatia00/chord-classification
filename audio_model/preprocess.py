@@ -4,10 +4,10 @@ import scipy
 import matplotlib.pyplot as plt
 import numpy as np
 import math
-from util import NUMBER_FRETS, SAMPLE_FREQ, WINDOW_SIZE, mel_filter_bank
+from audio_model.util import NUMBER_FRETS, SAMPLE_FREQ, WINDOW_SIZE, mel_filter_bank
 import pickle
 from tqdm import tqdm
-from dataset import GuitarDataset
+from audio_model.dataset import GuitarDataset
 import math
 import torch
 import librosa

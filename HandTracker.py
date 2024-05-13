@@ -4,11 +4,7 @@ import numpy as np
 import pyaudio
 import wave
 from moviepy.editor import VideoFileClip
-import os
-import sys
-
-# ignore stderror
-os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;udp'
+from tqdm import tqdm
 
 class HandTracker:
     def __init__(self):
@@ -128,16 +124,8 @@ class HandTracker:
         audio_clip.write_audiofile(audio_output_path)
 
     def track_hands_video(self, video_path, audio_output_path, output_path):
-        # Open devnull for writing
-        devnull = open(os.devnull, 'w')
-        # Redirect stderr to devnull
-        sys.stderr = devnull
-
         # extract and save audio for later processing
         self._extract_audio(video_path, audio_output_path)
-
-        # Start capturing video from saved file
-        print("Extracting hand data (DISREGARD CODEC ERRORS) ...")
 
         vidcap = cv2.VideoCapture(video_path)
 
@@ -153,7 +141,9 @@ class HandTracker:
         # Define the video writer for the output video
         out = cv2.VideoWriter(output_path, codec, fps, (width, height))
 
-        while True:
+        # Start capturing video from saved file
+        print("Extracting hand data (DISREGARD CODEC ERRORS) ...")
+        for _ in tqdm(range(int(vidcap.get(cv2.CAP_PROP_FRAME_COUNT)))):
             ret, frame = vidcap.read()
             if not ret:
                 break
@@ -179,7 +169,6 @@ class HandTracker:
         vidcap.release()
         out.release()
         cv2.destroyAllWindows()
-        sys.stderr = sys.__stderr__
         return hand_data
 
 

@@ -1,19 +1,19 @@
 import typer
 import torch
-from preprocess import load_samples_from_file
-from audio_model import AudioModel
+from audio_model.preprocess import load_samples_from_file
+from audio_model.audio_model import AudioModel
 from tqdm import tqdm
 from typing import Optional
 import numpy as np
 import os
-from util import SAMPLE_FREQ, WINDOW_SIZE
+from audio_model.util import SAMPLE_FREQ, WINDOW_SIZE
 
-def main(model: Optional[str] = typer.Option('model.pt'), 
+def audioPredict(model: Optional[str] = typer.Option('model.pt'), 
          filepath: Optional[str] = typer.Option('file.wav'), 
          raw_out: Optional[str] = typer.Option('results/output.txt'),
          notes_out: Optional[str] = typer.Option('results/notes.txt')):
   audio_model = AudioModel()
-  audio_model.load_state_dict(torch.load(model))
+  audio_model.load_state_dict(torch.load(model, map_location=torch.device("cpu")))
   audio_model.eval()
 
   # Generate predictions
@@ -56,4 +56,4 @@ def main(model: Optional[str] = typer.Option('model.pt'),
 
 
 if __name__ == '__main__':
-  typer.run(main)
+  typer.run(audioPredict)
