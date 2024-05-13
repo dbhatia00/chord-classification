@@ -6,7 +6,7 @@ from tqdm import tqdm
 from typing import Optional
 import numpy as np
 import os
-from audio_model.util import SAMPLE_FREQ, WINDOW_SIZE
+from audio_model.util import SAMPLE_FREQ, WINDOW_SIZE, note_strings
 
 def audioPredict(model: Optional[str] = typer.Option('model.pt'), 
          filepath: Optional[str] = typer.Option('file.wav'), 
@@ -40,6 +40,9 @@ def audioPredict(model: Optional[str] = typer.Option('model.pt'),
     note = np.where(p >= 0.3)
     notes.append(note[0].tolist())
 
+  # use actual pitched notes instead of corresponding indices
+  # notes = [[note_strings[idx] for idx in indices] for indices in notes]
+
   os.makedirs(os.path.dirname(raw_out), exist_ok=True)
   open(raw_out, 'w').close()
   with open(raw_out, 'a') as file:
@@ -53,6 +56,8 @@ def audioPredict(model: Optional[str] = typer.Option('model.pt'),
     for i, note in enumerate(notes):
       time = (i + WINDOW_SIZE//2) / SAMPLE_FREQ
       file.write(f'{time:.3f}: {note}\n')
+
+  return time, notes
 
 
 if __name__ == '__main__':
