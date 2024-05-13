@@ -23,14 +23,19 @@ class HandTracker:
         # Process the frame for hand tracking
         processFrames = self.hands.process(rgb_frame)
 
-        # Draw landmarks on the original frame
+        landmarks_list = []  # List to store hand landmarks
+
+        # Draw landmarks on the original frame and collect landmark data
         if processFrames.multi_hand_landmarks:
             for hand_landmarks in processFrames.multi_hand_landmarks:
                 self.mpdrawing.draw_landmarks(frame, hand_landmarks, self.mphands.HAND_CONNECTIONS)
+                # Collect each landmark x, y coordinates
+                landmarks = [(lmk.x * frame.shape[1], lmk.y * frame.shape[0]) for lmk in hand_landmarks.landmark]
+                landmarks_list.append(landmarks)
 
-        return frame
+        return frame, landmarks_list
 
-def auto_canny_and_hough(frame, initial_threshold1=100, initial_threshold2=150, desired_line_count=100, max_iterations=2):
+def hough_transform_and_join(frame, hand_frame, initial_threshold1=350, initial_threshold2=400, desired_line_count=2, max_iterations=2):
     # Adjust the thresholds based on the number of detected lines
     threshold1, threshold2 = initial_threshold1, initial_threshold2
     iteration = 0
@@ -41,7 +46,7 @@ def auto_canny_and_hough(frame, initial_threshold1=100, initial_threshold2=150, 
         edges = cv2.Canny(frame, threshold1, threshold2)
 
         # Apply Hough Line Segment Transformation
-        lines = cv2.HoughLinesP(edges, 1, np.pi / 180, 100, minLineLength=175, maxLineGap=75)
+        lines = cv2.HoughLinesP(edges, 1, np.pi / 180, 100, minLineLength=500, maxLineGap=150)
         
         line_count = len(lines) if lines is not None else 0
         print(f"Iteration {iteration}: Thresholds=({threshold1}, {threshold2}), Lines Detected={line_count}")
@@ -50,64 +55,103 @@ def auto_canny_and_hough(frame, initial_threshold1=100, initial_threshold2=150, 
         if line_count == desired_line_count:
             break
         elif line_count < desired_line_count:
-            threshold1 -= 25  # Decrease threshold to make edge detection less strict
-            threshold2 -= 25
+            threshold1 -= 50  # Decrease threshold to make edge detection less strict
+            threshold2 -= 50
         else:
-            threshold1 += 25  # Increase threshold to make edge detection more strict
-            threshold2 += 25
+            threshold1 += 50  # Increase threshold to make edge detection more strict
+            threshold2 += 50
 
         iteration += 1
 
         # Safety check to prevent thresholds from going negative
         threshold1 = max(threshold1, 1)
         threshold2 = max(threshold2, 1)
+        print(line_count)
 
     # Draw the detected lines on the frame for visualization
     if lines is not None:
         for line in lines:
             x1, y1, x2, y2 = line[0]
-            cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            cv2.line(hand_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
-    return frame
+    return hand_frame
 
-def process_images(folder_path, output_folder):
-    # Check if the input folder exists
-    if not os.path.exists(folder_path):
-        print(f"Error: The folder '{folder_path}' does not exist.")
-        return  # Stop the function if the folder doesn't exist
+def calculate_angle(p1, p2):
+    # Calculate the angle from horizontal
+    return np.degrees(np.arctan2(p2[1] - p1[1], p2[0] - p1[0]))
 
-    # Ensure output folder exists
-    if not os.path.exists(output_folder):
-        os.makedirs(output_folder)
+def rotate_image(image, angle, center):
+    # Get the rotation matrix
+    rot_mat = cv2.getRotationMatrix2D(center, angle, 1.0)
+    # Perform the rotation
+    return cv2.warpAffine(image, rot_mat, (image.shape[1], image.shape[0]))
 
-    # Initialize the hand tracker
-    hand_tracker = HandTracker()
+def process_images_with_rotation_and_cropping(folder_path, output_folder_combination, output_folder_hand, hand_tracker):
+    buffer_size = 0  # Buffer of 100 pixels
 
-    # Process each image in the folder
     for filename in os.listdir(folder_path):
-        if filename.endswith(".jpg") or filename.endswith(".png"):  # Add other file types if needed
+        if filename.endswith(".jpg") or filename.endswith(".png"):
             image_path = os.path.join(folder_path, filename)
             image = cv2.imread(image_path)
 
             if image is not None:
-                new_width = int(image.shape[1] * 4)
-                new_height = image.shape[0]
-                image = cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_LINEAR)
+                image_copy = image.copy()
+                hand_image, landmarks_list = hand_tracker.track_hands(image)
 
-                # Process the frame for Hough transformation
-                image = auto_canny_and_hough(image)
+                if len(landmarks_list) >= 2:
+                    # Assuming the first two sets of landmarks are the two hands
+                    left_hand = sorted(landmarks_list, key=lambda x: np.mean([lm[0] for lm in x]))[0]
+                    right_hand = sorted(landmarks_list, key=lambda x: np.mean([lm[0] for lm in x]))[1]
 
-                # Track hands and overlay the hand skeleton
-                image = hand_tracker.track_hands(image)
+                    # Calculate centroids of each hand
+                    left_hand_centroid = (np.mean([lm[0] for lm in left_hand]), np.mean([lm[1] for lm in left_hand]))
+                    right_hand_centroid = (np.mean([lm[0] for lm in right_hand]), np.mean([lm[1] for lm in right_hand]))
 
-                # Save the processed image
-                output_path = os.path.join(output_folder, filename)
-                cv2.imwrite(output_path, image)
-                print(f"Processed and saved {output_path}")
+                    # Calculate the angle for rotation
+                    angle = calculate_angle(left_hand_centroid, right_hand_centroid)
+
+                    # Calculate the center point for rotation
+                    center = ((left_hand_centroid[0] + right_hand_centroid[0]) / 2, (left_hand_centroid[1] + right_hand_centroid[1]) / 2)
+
+                    # Rotate the image
+                    rotated_image = rotate_image(image_copy, angle, center)
+                    rotated_hand_image = rotate_image(hand_image, angle, center)
+
+                    # After rotation, recalculate the position of left and right hands
+                    new_left_hand_x = int((left_hand_centroid[0] - center[0]) * np.cos(np.radians(-angle)) - (left_hand_centroid[1] - center[1]) * np.sin(np.radians(-angle)) + center[0])
+                    new_right_hand_x = int((right_hand_centroid[0] - center[0]) * np.cos(np.radians(-angle)) - (right_hand_centroid[1] - center[1]) * np.sin(np.radians(-angle)) + center[0])
+
+                    # Determine crop boundaries with buffer
+                    crop_x = int(max(min(new_left_hand_x, new_right_hand_x) - buffer_size, 0))
+                    crop_y = int(max(min([lm[1] for lm in left_hand + right_hand]) - buffer_size, 0))
+                    width = int(rotated_image.shape[1] - crop_x)
+                    height = int(min(max([lm[1] for lm in left_hand + right_hand]) + buffer_size, rotated_image.shape[0]) - crop_y)
+
+                    # Crop the image using the corrected integer indices
+                    cropped_image = rotated_image[crop_y:crop_y + height, crop_x:crop_x + width]
+                    cropped_hand_image = rotated_hand_image[crop_y:crop_y + height, crop_x:crop_x + width]
+
+                    # Save image with only hand tracker overlay
+                    output_path_hand = os.path.join(output_folder_hand, filename)
+                    cv2.imwrite(output_path_hand, cropped_hand_image)
+                    print(f"Processed and saved {output_path_hand}")
+
+                    joined_image = hough_transform_and_join(cropped_image, cropped_hand_image)
+
+                    # Save image with combination overlay
+                    output_path_combination = os.path.join(output_folder_combination, filename)
+                    cv2.imwrite(output_path_combination, joined_image)
+                    print(f"Processed and saved {output_path_combination}")
+                else:
+                    print(f"Not enough hands detected in {filename}. Skipping...")
             else:
                 print(f"Warning: Unable to load image '{image_path}'. Skipping...")
 
+
 if __name__ == "__main__":
-    folder_path = 'chord_images'  # Update this to your folder path
-    output_folder = 'augment_overlay'  # Update this to your desired output folder
-    process_images(folder_path, output_folder)
+    folder_path = 'transcription_data/tablature_frames'
+    output_folder_combination = 'transcription_data/tablature_images_combination'
+    output_folder_hand = 'transcription_data/tablature_images_hand'
+
+    hand_tracker = HandTracker()
+    process_images_with_rotation_and_cropping(folder_path, output_folder_combination, output_folder_hand, hand_tracker)
