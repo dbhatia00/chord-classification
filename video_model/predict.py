@@ -1,6 +1,8 @@
 import typer
 import numpy as np
 import cv2
+import torch
+from video_model.model import GuitarTabCNN
 from video_model.util import SAMPLES_PER_SECOND, guitar_notes
 from audio_model.util import note_strings
 
