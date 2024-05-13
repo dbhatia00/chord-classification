@@ -21,7 +21,7 @@ def audioPredict(model: Optional[str] = typer.Option('model.pt'),
   samples = torch.tensor(samples).type(torch.float32)
   preds = []
   for i in tqdm(range(samples.shape[0])):
-    pred = audio_model(samples[i])
+    pred = audio_model(torch.unsqueeze(samples[i], 0))
     preds.append(pred.detach().numpy())
   preds = np.vstack(preds)
 
