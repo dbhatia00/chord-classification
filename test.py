@@ -14,12 +14,12 @@ def main(video_path):
     tracker = HandTracker()
 
     # Generate a hash to use for intermediate representations
-    hash_code = "P9XDC"# ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
+    hash_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
 
     # Track hands in a saved video
     output_tracked_path = f'vid_dump/tracked-{hash_code}.mp4'
     audio_path = f'vid_dump/tracked-{hash_code}.wav'
-    #data = tracker.track_hands_video(video_path, audio_path, output_tracked_path)
+    data = tracker.track_hands_video(video_path, audio_path, output_tracked_path)
 
     # Do Audio Prediction
     print("Beginning Audio Prediction...")
