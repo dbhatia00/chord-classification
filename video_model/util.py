@@ -26,7 +26,6 @@ chords = {
     'G_major': ['G2', 'B2', 'D3', 'G4'],
     'C_major': ['C3', 'E3', 'G3'],
     'E_major': ['E2', 'G#2', 'B2'],
-    'F_major': ['F2', 'A2', 'C3'],
     'B_major': ['B2', 'D#3', 'F#3'],
     'A_major': ['A2', 'C#3', 'E3'],
     'D_minor': ['D2', 'F2', 'A2'],

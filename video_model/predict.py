@@ -8,11 +8,12 @@ from video_model.util import SAMPLES_PER_SECOND, guitar_notes
 from audio_model.util import note_strings
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+from skimage.color import rgb2gray
 
 # Function to generate probabilities tensor from a frame
 def generate_probabilities(frame, model):
     # Convert image to grayscale using weighted sum
-    image_gray = np.dot(frame[..., :3], [0.2989, 0.5870, 0.1140])
+    image_gray = rgb2gray(frame)
 
     # Crop the image (example values)
     left = image_gray.shape[1] // 3
@@ -29,13 +30,13 @@ def generate_probabilities(frame, model):
     data = np.load('video_model/mean_std.npy')
     mean = data[0]
     stddev = data[1]
-    image_normalized = (image_normalized - mean) / stddev
+    image_normalized = (image_resized - mean) / stddev
 
     # Convert NumPy array to PyTorch tensor
     image_tensor = torch.tensor(image_normalized, dtype=torch.float32)
     # Add batch dimension to the image tensor
     image_tensor = image_tensor.unsqueeze(0).unsqueeze(0)  # Add batch and channel dimensions
-
+    
     # Pass the image tensor to the model
     with torch.no_grad():
         output = model(image_tensor)

@@ -18,7 +18,8 @@ def print_fretboard(chord):
         'C_major': [0, 3, 2, 0, 1, 0],
         'F_major': [0, 2, 2, 1, 0, 0],
         'B_major': [0, 1, 3, 3, 3, 1],
-        'D_minor': [0, 0, 0, 2, 3, 1]
+        'D_minor': [0, 0, 0, 2, 3, 1],
+        'E7': [0, 2, 0, 1, 0 ,0]
     }
 
     # Update the fretboard with the fingers for the given chord
@@ -65,18 +66,26 @@ def analyzeProbs(audioTimes, audioProbs, videoTimes, videoProbs, hash):
     videoTimes = videoTimes[:min_rows]
 
 
-    # Convert lists to numpy arrays
-    # Element-wise multiplication
-    resultProbs = np.array(audioProbs) * np.array(videoProbs)
-
+    # NOTE: One of these probs should be videoProbs
+    # Replaced for demo purposes
+    '''
+    resultProbs = np.array(audioProbs) * np.array(audioProbs)
+    #print(resultProbs)
     notes = []
     for p in resultProbs:
-        note = np.where(p >= 0.30)
+        note = np.where(p >= 0.95)
         notes.append(note[0].tolist())
-    
-    notes = [[note_strings[idx] for idx in indices] for indices in notes]
-    #plotResults(audioTimes, notes)
+    '''
+    resultProbs = np.array(audioProbs) * np.array(videoProbs)
+    #print(resultProbs)
+    notes = []
+    for p in resultProbs:
+        note = np.where(p >= 0.35)
+        notes.append(note[0].tolist())
 
+    notes = [[note_strings[idx] for idx in indices] for indices in notes]
+    #print(notes)
+    print()
     # Calculate the closest chords
     closest_chords = []
     for i in notes:
@@ -90,7 +99,7 @@ def analyzeProbs(audioTimes, audioProbs, videoTimes, videoProbs, hash):
 
     # Write tensor to file
     with open(notes_out, 'w') as file:
-        for timestamp, probabilities in zip(audioTimes, notes):
+        for timestamp, probabilities in zip(audioTimes, resultProbs):
             file.write(f"{timestamp:.3f}: {list(probabilities)}\n")
 
     # Flatten the list of lists
