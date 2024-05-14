@@ -4,6 +4,34 @@ from audio_model.util import note_strings
 from video_model.util import guitar_notes_dict, chords
 import matplotlib.pyplot as plt
 
+def print_fretboard(chord):
+    # Define the fretboard as a list of lists
+    fretboard = [['-' for _ in range(6)] for _ in range(5)]  # 6 strings, 5 frets
+
+    # Define the frets where fingers are placed for the given chord
+    chord_fingers = {
+        'E_major': [0, 2, 2, 1, 0, 0],
+        'E_minor': [0, 2, 2, 0, 0, 0],
+        'A_major': [0, 0, 2, 2, 2, 0],
+        'D_major': [0, 0, 0, 2, 3, 2],
+        'G_major': [3, 2, 0, 0, 0, 3],
+        'C_major': [0, 3, 2, 0, 1, 0],
+        'F_major': [0, 2, 2, 1, 0, 0],
+        'B_major': [0, 1, 3, 3, 3, 1],
+        'D_minor': [0, 0, 0, 2, 3, 1]
+    }
+
+    # Update the fretboard with the fingers for the given chord
+    for string, fingers in enumerate(chord_fingers[chord]):
+        fretboard[fingers][string] = 'O'  # Place finger on the fret
+
+    # Print the fretboard
+    for fret in range(4, -1, -1):  # Print frets from 4 to 0
+        print('|', end='')
+        for string in range(6):
+            print(fretboard[fret][string], end='|')
+        print()
+
 # Function to calculate Euclidean distance between two sets of notes
 def euclidean_distance(notes1, notes2):
     note_indices = {note: i for i, note in enumerate(['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'])}
@@ -43,11 +71,10 @@ def analyzeProbs(audioTimes, audioProbs, videoTimes, videoProbs, hash):
 
     notes = []
     for p in resultProbs:
-        note = np.where(p >= 0.20)
+        note = np.where(p >= 0.30)
         notes.append(note[0].tolist())
     
     notes = [[note_strings[idx] for idx in indices] for indices in notes]
-    print(notes)
     #plotResults(audioTimes, notes)
 
     # Calculate the closest chords
@@ -58,7 +85,7 @@ def analyzeProbs(audioTimes, audioProbs, videoTimes, videoProbs, hash):
             closest_chords.append([closest])
         else:
             closest_chords.append([])
-    print(closest_chords)
+
     notes_out = f"results/FINAL-{hash}.txt"
 
     # Write tensor to file
@@ -66,4 +93,16 @@ def analyzeProbs(audioTimes, audioProbs, videoTimes, videoProbs, hash):
         for timestamp, probabilities in zip(audioTimes, notes):
             file.write(f"{timestamp:.3f}: {list(probabilities)}\n")
 
-    return resultProbs
+    # Flatten the list of lists
+    unique_chords = [chord for chord in closest_chords if chord]  # Remove empty lists
+    unique_chords_no_duplicates = remove_adjacent_duplicates(unique_chords)
+    return unique_chords_no_duplicates
+
+def remove_adjacent_duplicates(lst):
+    result = []
+    prev = None
+    for item in lst:
+        if item != prev:
+            result.append(item)
+            prev = item
+    return result

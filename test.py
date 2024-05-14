@@ -7,7 +7,7 @@ from HandTracker import HandTracker
 from seeFretboard import SeeFretboard
 from audio_model.predict import audioPredict
 from video_model.predict import videoPredict
-from Analyze import analyzeProbs
+from Analyze import analyzeProbs, print_fretboard
 
 def main(video_path):
     # Initialize tracker object
@@ -34,10 +34,15 @@ def main(video_path):
     video_timestamps, video_probabilities = videoPredict(modelpath="video_model/model.pt", filepath=video_path, 
                                                          raw_out=f"./results/output-{hash_code}-video.txt")
     print("Combining Data for best guesses...")   
-    
-    analyzeProbs(audio_timestamps, audio_probabilities, video_timestamps, video_probabilities, hash_code)
 
+    chords = analyzeProbs(audio_timestamps, audio_probabilities, video_timestamps, video_probabilities, hash_code) 
     print(f"Data available in results/FINAL-{hash_code}.txt")
+
+    print(f"Chord progression is - {chords}")
+    for chord in chords:
+        print(chord[0])
+        print_fretboard(chord[0])
+    
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Perform all video preprocessing and ")
