@@ -55,7 +55,7 @@ def find_closest_chord(notes):
             closest_chord = chord
     return closest_chord
 
-def analyzeProbs(audioTimes, audioProbs, videoTimes, videoProbs, hash):
+def analyzeProbs(audioTimes, audioProbs, videoTimes, videoProbs, hash, tolerance):
     # Determine the minimum number of rows
     min_rows = min(len(audioProbs), len(videoProbs))
     
@@ -73,18 +73,19 @@ def analyzeProbs(audioTimes, audioProbs, videoTimes, videoProbs, hash):
     #print(resultProbs)
     notes = []
     for p in resultProbs:
-        note = np.where(p >= 0.95)
+        note = np.where(p >= tolerance)
         notes.append(note[0].tolist())
     '''
     resultProbs = np.array(audioProbs) * np.array(videoProbs)
     #print(resultProbs)
     notes = []
     for p in resultProbs:
-        note = np.where(p >= 0.35)
+        note = np.where(p >= tolerance)
         notes.append(note[0].tolist())
-
+    
     notes = [[note_strings[idx] for idx in indices] for indices in notes]
-    #print(notes)
+    print("Detected Notes - ")
+    print(notes)
     print()
     # Calculate the closest chords
     closest_chords = []

@@ -9,7 +9,7 @@ from audio_model.predict import audioPredict
 from video_model.predict import videoPredict
 from Analyze import analyzeProbs, print_fretboard
 
-def main(video_path):
+def main(video_path, tolerance):
     # Initialize tracker object
     tracker = HandTracker()
 
@@ -35,7 +35,7 @@ def main(video_path):
                                                          raw_out=f"./results/output-{hash_code}-video.txt")
     print("Combining Data for best guesses...")   
 
-    chords = analyzeProbs(audio_timestamps, audio_probabilities, video_timestamps, video_probabilities, hash_code) 
+    chords = analyzeProbs(audio_timestamps, audio_probabilities, video_timestamps, video_probabilities, hash_code, tolerance) 
     print(f"Data available in results/FINAL-{hash_code}.txt")
 
     print(f"Chord progression is - {chords}")
@@ -47,5 +47,6 @@ def main(video_path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Perform all video preprocessing and ")
     parser.add_argument("video_path", metavar="video_path", type=str, help="Path to the input video file")
+    parser.add_argument("tolerance", metavar="tolerance", type=float, help="Tolerance")
     args = parser.parse_args()
-    main(args.video_path)
+    main(args.video_path, args.tolerance)
