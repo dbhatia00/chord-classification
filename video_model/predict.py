@@ -2,46 +2,50 @@ import typer
 import numpy as np
 import cv2
 import torch
+from torchvision import transforms
 from video_model.model import GuitarTabCNN
 from PIL import Image 
 from video_model.util import SAMPLES_PER_SECOND, guitar_notes
 from audio_model.util import note_strings
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+from skimage.color import rgb2gray
 
-# Function to generate probabilities tensor from a frame
-def generate_probabilities(frame, model):
+def generate_probabilities(frame, model, mean_std=np.load('video_model/mean_std.npy')):
     # Convert image to grayscale using weighted sum
-    image_gray = np.dot(frame[..., :3], [0.2989, 0.5870, 0.1140])
+    image_gray = rgb2gray(frame)
 
     # Crop the image (example values)
     left = image_gray.shape[1] // 3
     top = image_gray.shape[0] // 2
     image_cropped = image_gray[top:, left:]
-    #image_cropped = image_gray
+
     # Resize the image (example dimensions)
     width = 320
     height = 270
     image_resized = np.array(Image.fromarray(image_cropped).resize((width, height)))
+    #plt.imshow(image_resized, cmap='gray')
+    #plt.axis('off')  # Turn off axis
+    #plt.show()
+    # Define transformation pipeline
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[mean_std[0]], std=[mean_std[1]])
+    ])
 
-    # Normalize the image
-    image_normalized = image_resized / 255.0    
-    data = np.load('video_model/mean_std.npy')
-    mean = data[0]
-    stddev = data[1]
-    image_normalized = (image_normalized - mean) / stddev
+    # Apply the transformation pipeline
+    image_tensor = transform(image_resized)
 
-    # Convert NumPy array to PyTorch tensor
-    image_tensor = torch.tensor(image_normalized, dtype=torch.float32)
-    # Add batch dimension to the image tensor
-    image_tensor = image_tensor.unsqueeze(0).unsqueeze(0)  # Add batch and channel dimensions
+    # Convert image tensor to batched tensor
+    image_tensor = image_tensor.unsqueeze(0)  # Add batch dimension
 
     # Pass the image tensor to the model
     with torch.no_grad():
         output = model(image_tensor)
 
-    output = output.reshape(6, 21).numpy()
-
+    print(output.view(-1, 21))
+    print(output)
+    print()
     return output
 
 # Define the reorder_probabilities function
