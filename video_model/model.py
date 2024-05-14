@@ -1,7 +1,5 @@
-# Trained with data augmentation. Test pressed accuracy: 90.8%, Test open accuracy: 79.92%. May work better with new video data.
-
-import torch
 import torch.nn as nn
+import torch
 
 class GuitarTabCNN(nn.Module):
     def __init__(self):
