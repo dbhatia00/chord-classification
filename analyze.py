@@ -43,7 +43,7 @@ def analyzeProbs(audioTimes, audioProbs, videoTimes, videoProbs, hash):
 
     notes = []
     for p in resultProbs:
-        note = np.where(p >= 0.95)
+        note = np.where(p >= 0.20)
         notes.append(note[0].tolist())
     
     notes = [[note_strings[idx] for idx in indices] for indices in notes]

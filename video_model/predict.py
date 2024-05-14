@@ -3,16 +3,46 @@ import numpy as np
 import cv2
 import torch
 from video_model.model import GuitarTabCNN
+from PIL import Image 
 from video_model.util import SAMPLES_PER_SECOND, guitar_notes
 from audio_model.util import note_strings
+import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 # Function to generate probabilities tensor from a frame
-def generate_probabilities(frame):
-    # Generate a 6x21 tensor of em
-    em_chord = np.zeros((6, 21))
-    em_chord[3,2] = 0.8
-    em_chord[4,2] = 0.8
-    return em_chord
+def generate_probabilities(frame, model):
+    # Convert image to grayscale using weighted sum
+    image_gray = np.dot(frame[..., :3], [0.2989, 0.5870, 0.1140])
+
+    # Crop the image (example values)
+    left = image_gray.shape[1] // 3
+    top = image_gray.shape[0] // 2
+    image_cropped = image_gray[top:, left:]
+    #image_cropped = image_gray
+    # Resize the image (example dimensions)
+    width = 320
+    height = 270
+    image_resized = np.array(Image.fromarray(image_cropped).resize((width, height)))
+
+    # Normalize the image
+    image_normalized = image_resized / 255.0    
+    data = np.load('video_model/mean_std.npy')
+    mean = data[0]
+    stddev = data[1]
+    image_normalized = (image_normalized - mean) / stddev
+
+    # Convert NumPy array to PyTorch tensor
+    image_tensor = torch.tensor(image_normalized, dtype=torch.float32)
+    # Add batch dimension to the image tensor
+    image_tensor = image_tensor.unsqueeze(0).unsqueeze(0)  # Add batch and channel dimensions
+
+    # Pass the image tensor to the model
+    with torch.no_grad():
+        output = model(image_tensor)
+
+    output = output.reshape(6, 21).numpy()
+
+    return output
 
 # Define the reorder_probabilities function
 def reorder_probabilities(probability_tensor, threshold):
@@ -39,7 +69,7 @@ def reorder_probabilities(probability_tensor, threshold):
     
     return reordered_probabilities
 
-def videoPredict(model: str = typer.Option('model.pt'), 
+def videoPredict(modelpath: str = typer.Option('model.pt'), 
          filepath: str = typer.Option('file.wav'), 
          raw_out: str = typer.Option('results/output.txt'),
          notes_out: str = typer.Option('results/notes.txt')):
@@ -55,20 +85,29 @@ def videoPredict(model: str = typer.Option('model.pt'),
     # Calculate timestamp increment based on original frames per second
     timestamp_increment = 1.0 / frames_per_second
 
+    # Instantiate the model
+    model = GuitarTabCNN()
+    # Load the trained weights into the model
+    model.load_state_dict(torch.load(modelpath, map_location=torch.device("cpu")))
+    # Set the model to evaluation mode
+    model.eval()
+
     # Generate probabilities tensor while iterating over frames at specified frequency
     probabilities_tensor = []
     timestamps = []
     frame_count = 0
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        if (frame_count % frame_interval == 0) and (frame_count != 0):
-            probabilities = generate_probabilities(frame)
-            probabilities_tensor.append(probabilities)
-            # Append the timestamp with the correct increment
-            timestamps.append(timestamp_increment * frame_count)
-        frame_count += 1
+    with tqdm(total=int(cap.get(cv2.CAP_PROP_FRAME_COUNT))) as pbar:
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            if (frame_count % frame_interval == 0) and (frame_count != 0):
+                probabilities = generate_probabilities(frame, model)
+                probabilities_tensor.append(probabilities)
+                # Append the timestamp with the correct increment
+                timestamps.append(timestamp_increment * frame_count)
+            frame_count += 1
+            pbar.update(1)
 
     # Close video file
     cap.release()

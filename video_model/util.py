@@ -22,7 +22,6 @@ guitar_notes_dict = {
 
 chords = {
     'E_minor': ['E2', 'G2', 'B2'],
-    'A_minor': ['A2', 'C3', 'E3'],
     'D_major': ['D2', 'F#2', 'A2'],
     'G_major': ['G2', 'B2', 'D3'],
     'C_major': ['C3', 'E3', 'G3'],

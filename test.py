@@ -17,9 +17,10 @@ def main(video_path):
     hash_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
 
     # Track hands in a saved video
+    print("Extracting Audio from Video...")
     output_tracked_path = f'vid_dump/tracked-{hash_code}.mp4'
     audio_path = f'vid_dump/tracked-{hash_code}.wav'
-    data = tracker.track_hands_video(video_path, audio_path, output_tracked_path)
+    data = tracker._extract_audio(video_path, audio_path)
 
     # Do Audio Prediction
     print("Beginning Audio Prediction...")
@@ -30,11 +31,11 @@ def main(video_path):
 
     print("Beginning Video Prediction...")
 
-    video_timestamps, video_probabilities = videoPredict(filepath=output_tracked_path, 
+    video_timestamps, video_probabilities = videoPredict(modelpath="video_model/model.pt", filepath=video_path, 
                                                          raw_out=f"./results/output-{hash_code}-video.txt")
     print("Combining Data for best guesses...")   
     
-    analyzeProbs(audio_timestamps, audio_probabilities, video_timestamps, audio_probabilities, hash_code)
+    analyzeProbs(audio_timestamps, audio_probabilities, video_timestamps, video_probabilities, hash_code)
 
     print(f"Data available in results/FINAL-{hash_code}.txt")
 
