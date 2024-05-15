@@ -33,17 +33,15 @@ def mel_filter_bank(blockSize, num_coefficients, min_hz, max_hz):
 
     # Create a matrix for triangular filters, one row per filter
     filterMatrix = np.zeros((numBands, blockSize))
-
     melRange = np.array(range(numBands + 2))
-
     melCenterFilters = melRange * (maxMel - minMel) / (numBands + 1) + minMel
 
-    # each array index represent the center of each triangular filter
+    # Each array index represent the center of each triangular filter
     aux = np.log(1 + 1000.0 / 700.0) / 1000.0
     aux = (np.exp(melCenterFilters * aux) - 1) / 22050
     aux = 0.5 + 700 * blockSize * aux
-    aux = np.floor(aux)  # Arredonda pra baixo
-    centerIndex = np.array(aux, int)  # Get int values
+    aux = np.floor(aux)
+    centerIndex = np.array(aux, int)
 
     for i in range(numBands):
         start, centre, end = centerIndex[i:i + 3]

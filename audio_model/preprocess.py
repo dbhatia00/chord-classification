@@ -38,9 +38,7 @@ def load_sample(signal, sample_rate, time_range):
   max_hz = 3000
 
   complex_spectrum = np.fft.fft(samples)[:4408]
-  # xf = scipy.fft.fftfreq(len(samples), 1 / sample_rate)
   power_spectrum = abs(complex_spectrum) ** 2
-  filtered_spectrum = np.where(power_spectrum == 0.0, 1e-20, power_spectrum)
   global mel_filter
   if mel_filter is None:
     mel_filter = mel_filter_bank(power_spectrum.shape[0], num_coefficients, min_hz, max_hz)
